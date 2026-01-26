@@ -5,11 +5,63 @@
     "paths": {
       "@/*": [
         "./*"
-      ]
+      ],
+      "@app/*": [
+        "./src/app/*"
+      ],
+      "@assets/*": [
+        "./src/assets/*"
+      ],
+      "@services/*": [
+        "./src/services/*"
+      ],
+      "@features/*": [
+        "./src/features/*"
+      ],
+      "@shared/*": [
+        "./src/shared/*"
+      ],
+      "@api/*": [
+        "./src/core/api/*"
+      ],
+      "@config/*": [
+        "./src/core/config/*"
+      ],
+      "@security/*": [
+        "./src/core/security/*"
+      ],
+      "@storage/*": [
+        "./src/core/storage/*"
+      ],
+      "@components/*": [
+        "./src/shared/components/*"
+      ],
+      "@constants/*": [
+        "./src/shared/constants/*"
+      ],
+      "@contexts/*": [
+        "./src/shared/contexts/*"
+      ],
+      "@data/*": [
+        "./src/shared/data/*"
+      ],
+      "@hooks/*": [
+        "./src/shared/hooks/*"
+      ],
+      "@store/*": [
+        "./src/shared/store/*"
+      ],
+      "@types/*": [
+        "./src/shared/types/*"
+      ],
+      "@utils/*": [
+        "./src/shared/utils/*"
+      ],
     }
   },
   "include": [
     "**/*.ts",
+    "**/*.js",
     "**/*.tsx",
     ".expo/types/**/*.ts",
     "expo-env.d.ts"

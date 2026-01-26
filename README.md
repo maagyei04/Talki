@@ -1,50 +1,60 @@
-# Welcome to your Expo app 👋
+# Talki 🗣️
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Talki is a high-performance AI personal language assistant specifically designed for immigrants. It goes beyond simple translation to provide a comprehensive communication toolkit, helping users navigate new environments with confidence.
 
-## Get started
+## Key Features
 
-1. Install dependencies
+-   **High-Performance Translation**: Instant, accurate translation to break language barriers in real-time.
+-   **Conversation Transcription**: Automatically transcribes your conversations, ensuring you never miss a detail from important meetings or appointments.
+-   **Smart Actions**: AI-powered extraction of "Smart Actions" (deadlines, appointments, reminders) directly from your transcribed interactions.
+-   **Immigrant-Centric Design**: Tailored to the unique needs of individuals navigating new languages and cultures.
 
+## Getting Started
+
+### Prerequisites
+
+- [Node.js](https://nodejs.org/) (LTS version recommended)
+- [Expo Go](https://expo.dev/go) app on your mobile device (to run on physical hardware)
+
+### Installation
+
+1. Clone the repository:
+   ```bash
+   git clone <repository-url>
+   cd Talki
+   ```
+
+2. Install dependencies:
    ```bash
    npm install
    ```
 
-2. Start the app
-
+3. Start the development server:
    ```bash
    npx expo start
    ```
 
-In the output, you'll find options to open the app in a
+### Usage
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+Once the development server is running, you can:
+- Scan the QR code with **Expo Go** (Android) or the **Camera app** (iOS) to run the app on your physical device.
+- Press `a` for Android Emulator.
+- Press `i` for iOS Simulator.
+- Press `w` for the Web version.
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+## Tech Stack
 
-## Get a fresh project
+- **Framework**: [Expo](https://expo.dev/) (React Native)
+- **Routing**: [Expo Router](https://docs.expo.dev/router/introduction/)
+- **Styling**: [Shopify Restyle](https://github.com/Shopify/restyle)
+- **Animation**: [Lottie](https://lottiereactnative.dev/) & [React Native Reanimated](https://docs.swmansion.com/react-native-reanimated/)
 
-When you're ready, run:
+## Learn More
 
-```bash
-npm run reset-project
-```
+To learn more about the tools used in this project:
+- [Expo Documentation](https://docs.expo.dev/)
+- [React Native Documentation](https://reactnative.dev/)
+- [Expo Router Guide](https://docs.expo.dev/router/introduction/)
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+---
+Created by [Agyei Michael Addai (Michantech)](https://www.linkedin.com/in/michael-addai-agyei)
