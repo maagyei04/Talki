@@ -38,9 +38,10 @@ Talki is a high-performance AI personal language assistant specifically designed
    ```
 
 3. Configure Environment Variables:
-   Create a `.env` file in the root directory and add your AssemblyAI API key:
+   Create a `.env` file in the root directory and add your Supabase credentials:
    ```env
-   EXPO_PUBLIC_ASSEMBLYAI_API_KEY=your_assemblyai_api_key_here
+   EXPO_PUBLIC_SUPABASE_URL=your_supabase_url
+   EXPO_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
    ```
 
 4. Start the development server:
@@ -48,13 +49,31 @@ Talki is a high-performance AI personal language assistant specifically designed
    npx expo start
    ```
 
-## AI Service Setup
+## Infrastructure & Security
 
-Talki uses **AssemblyAI** for its state-of-the-art transcription and language detection. To get your API key:
+### Tech Stack
 
-1. Sign up at [AssemblyAI](https://www.assemblyai.com/).
-2. Copy your API key from the dashboard.
-3. Add it to your `.env` file as shown above.
+- **Framework**: [Expo](https://expo.dev/) (React Native)
+- **Routing**: [Expo Router](https://docs.expo.dev/router/introduction/)
+- **Backend/Database**: [Supabase](https://supabase.com/)
+- **AI Engine (STT)**: OpenAI Whisper (via Supabase Edge Functions)
+- **AI Intelligence**: OpenAI GPT-4o-mini (via Supabase Edge Functions)
+- **Styling**: [Shopify Restyle](https://github.com/Shopify/restyle)
+- **Animation**: [Lottie](https://lottiereactnative.dev/) & [React Native Reanimated](https://docs.swmansion.com/react-native-reanimated/)
+
+### Security
+
+To ensure maximum security and protect project credentials, all AI processing (Speech-to-Text and Translation) is handled server-side via **Supabase Edge Functions**. 
+- No provider API keys (OpenAI, etc.) are stored or exposed on the client side.
+- Communication between the app and AI models is encrypted and proxied through our secure backend.
+
+## Project Setup
+
+Talki uses **Supabase** for its backend infrastructure. To get started:
+
+1. Create a new project at [Supabase](https://supabase.com/).
+2. Obtain your `Project URL` and `Anon Key` from the API settings.
+3. Add them to your `.env` file as shown in the installation steps.
 
 ### Usage
 
@@ -64,19 +83,12 @@ Once the development server is running, you can:
 - Press `i` for iOS Simulator.
 - Press `w` for the Web version.
 
-## Tech Stack
-
-- **Framework**: [Expo](https://expo.dev/) (React Native)
-- **Routing**: [Expo Router](https://docs.expo.dev/router/introduction/)
-- **Styling**: [Shopify Restyle](https://github.com/Shopify/restyle)
-- **Animation**: [Lottie](https://lottiereactnative.dev/) & [React Native Reanimated](https://docs.swmansion.com/react-native-reanimated/)
-
 ## Learn More
 
 To learn more about the tools used in this project:
 - [Expo Documentation](https://docs.expo.dev/)
-- [React Native Documentation](https://reactnative.dev/)
-- [Expo Router Guide](https://docs.expo.dev/router/introduction/)
+- [Supabase Documentation](https://supabase.com/docs)
+- [OpenAI API Reference](https://platform.openai.com/docs/api-reference)
 
 ---
 Created by [Agyei Michael Addai (Michantech)](https://www.linkedin.com/in/michael-addai-agyei)
