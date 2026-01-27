@@ -2,6 +2,14 @@
 
 Talki is a high-performance AI personal language assistant specifically designed for immigrants. It goes beyond simple translation to provide a comprehensive communication toolkit, helping users navigate new environments with confidence.
 
+## Visual Preview
+
+<p align="center">
+  <img src="./src/assets/images/screenshot1.jpg" width="30%" />
+  <img src="./src/assets/images/screenshot2.jpg" width="30%" />
+  <img src="./src/assets/images/screenshot3.jpg" width="30%" />
+</p>
+
 ## Key Features
 
 -   **High-Performance Translation**: Instant, accurate translation to break language barriers in real-time.
@@ -29,10 +37,24 @@ Talki is a high-performance AI personal language assistant specifically designed
    npm install
    ```
 
-3. Start the development server:
+3. Configure Environment Variables:
+   Create a `.env` file in the root directory and add your AssemblyAI API key:
+   ```env
+   EXPO_PUBLIC_ASSEMBLYAI_API_KEY=your_assemblyai_api_key_here
+   ```
+
+4. Start the development server:
    ```bash
    npx expo start
    ```
+
+## AI Service Setup
+
+Talki uses **AssemblyAI** for its state-of-the-art transcription and language detection. To get your API key:
+
+1. Sign up at [AssemblyAI](https://www.assemblyai.com/).
+2. Copy your API key from the dashboard.
+3. Add it to your `.env` file as shown above.
 
 ### Usage
 
