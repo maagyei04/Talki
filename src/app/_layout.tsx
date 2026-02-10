@@ -17,7 +17,7 @@ import ErrorBoundary from '../shared/components/common/ErrorBoundary';
 import GlobalStatusBar from '../shared/components/common/GlobalStatusBar';
 
 export const unstable_settings = {
-  anchor: 'app',
+  anchor: 'index',
 };
 
 SplashScreen.preventAutoHideAsync();
