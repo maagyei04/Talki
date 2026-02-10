@@ -1,5 +1,4 @@
 import theme, { Theme } from '@/src/services/config/theme';
-import { getLocalData, saveLocalData } from '@services/storage/index';
 import { ThemeProvider } from '@shopify/restyle';
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { useColorScheme } from 'react-native';
@@ -37,34 +36,27 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const AppThemeProvider = ({ children }: { children: React.ReactNode }) => {
     const systemColorScheme = useColorScheme();
-    const [themeMode, setThemeModeState] = useState<ThemeMode>('system');
+    const [themeMode, setThemeModeState] = useState<ThemeMode>('light');
 
     useEffect(() => {
-        const loadTheme = async () => {
-            const savedTheme = await getLocalData('themeMode') as ThemeMode | null;
-            if (savedTheme) {
-                setThemeModeState(savedTheme);
-            } else {
-                setThemeModeState('system');
-            }
-        };
-        loadTheme();
+        // Theme loading disabled for now to force Light Mode
+        setThemeModeState('light');
     }, []);
 
     const setThemeMode = async (mode: ThemeMode) => {
-        setThemeModeState(mode);
-        await saveLocalData('themeMode', mode);
+        // Disabled for now
+        // setThemeModeState(mode);
+        // await saveLocalData('themeMode', mode);
     };
 
     const toggleTheme = async () => {
-        const newTheme = themeMode === 'light' ? 'dark' : 'light';
-        await setThemeMode(newTheme);
+        // Disabled for now
     };
 
     const contextValue = useMemo(() => {
-        const effectiveMode = themeMode === 'system' ? systemColorScheme : themeMode;
-        const isDark = effectiveMode === 'dark';
-        const activeTheme = isDark ? createDarkTheme(theme) : theme;
+        const effectiveMode = 'light'; // Always Light Mode for now
+        const isDark = false;
+        const activeTheme = theme;
 
         return {
             themeMode,

@@ -1,3 +1,4 @@
+import { supabase } from "@/src/services/supabase";
 import { useRouter } from "expo-router";
 import LottieView from 'lottie-react-native';
 import React, { useEffect, useState } from 'react';
@@ -13,8 +14,16 @@ const { height } = Dimensions.get('window');
 const Index = () => {
     const router = useRouter();
     const [splashFinished, setSplashFinished] = useState(false);
+    const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
 
     useEffect(() => {
+        const checkSession = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            setIsAuthenticated(!!session);
+        };
+
+        checkSession();
+
         const timer = setTimeout(() => {
             setSplashFinished(true);
         }, 3000);
@@ -23,10 +32,14 @@ const Index = () => {
     }, []);
 
     useEffect(() => {
-        if (splashFinished) {
-            router.replace('/auth');
+        if (splashFinished && isAuthenticated !== null) {
+            if (isAuthenticated) {
+                router.replace('/main/Home');
+            } else {
+                router.replace('/auth');
+            }
         }
-    }, [splashFinished, router]);
+    }, [splashFinished, isAuthenticated, router]);
 
     if (!splashFinished) {
         return <SplashAnimation />;

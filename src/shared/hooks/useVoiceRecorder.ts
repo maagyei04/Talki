@@ -1,9 +1,9 @@
-import { 
-  AudioModule, 
-  RecordingPresets, 
-  useAudioRecorder, 
-  setAudioModeAsync, 
-  useAudioRecorderState 
+import {
+    AudioModule,
+    RecordingPresets,
+    setAudioModeAsync,
+    useAudioRecorder,
+    useAudioRecorderState
 } from 'expo-audio';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert } from 'react-native';
@@ -20,9 +20,13 @@ export const useVoiceRecorder = () => {
                 console.warn('Microphone permission not granted');
             }
 
-            setAudioModeAsync({
+            // Set default mode for playback (Speaker)
+            await setAudioModeAsync({
                 playsInSilentMode: true,
-                allowsRecording: true,
+                allowsRecording: false,
+                shouldRouteThroughEarpiece: false,
+                interruptionMode: 'doNotMix',
+                shouldPlayInBackground: true,
             });
         })();
     }, []);
@@ -38,9 +42,18 @@ export const useVoiceRecorder = () => {
                 }
             }
 
+            // Enable recording and switch to earpiece/mic mode
+            await setAudioModeAsync({
+                playsInSilentMode: true,
+                allowsRecording: true,
+                shouldRouteThroughEarpiece: false, // Try to keep speaker even here
+                interruptionMode: 'doNotMix',
+                shouldPlayInBackground: true,
+            });
+
             console.log('Preparing to record...');
             await recorder.prepareToRecordAsync();
-            
+
             console.log('Starting recording...');
             recorder.record();
             setRecordingUri(null);
@@ -57,6 +70,15 @@ export const useVoiceRecorder = () => {
             const uri = recorder.uri;
             setRecordingUri(uri);
             console.log('Recording stopped and stored at', uri);
+
+            // Revert to playback-friendly mode (Speaker)
+            await setAudioModeAsync({
+                playsInSilentMode: true,
+                allowsRecording: false,
+                shouldRouteThroughEarpiece: false,
+                interruptionMode: 'doNotMix',
+                shouldPlayInBackground: true,
+            });
         } catch (err) {
             console.error('Failed to stop recording', err);
         }

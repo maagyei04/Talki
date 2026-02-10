@@ -56,8 +56,9 @@ Talki is a high-performance AI personal language assistant specifically designed
 - **Framework**: [Expo](https://expo.dev/) (React Native)
 - **Routing**: [Expo Router](https://docs.expo.dev/router/introduction/)
 - **Backend/Database**: [Supabase](https://supabase.com/)
-- **AI Engine (STT)**: OpenAI Whisper (via Supabase Edge Functions)
-- **AI Intelligence**: OpenAI GPT-4o-mini (via Supabase Edge Functions)
+- **AI Engine (STT)**: OpenAI gpt-4o-mini-transcribe (via Supabase Edge Functions)
+- **AI Intelligence**: OpenAI gpt-4o-mini (via Supabase Edge Functions)
+- **Speech (TTS)**: OpenAI gpt-4o-mini-tts (via Supabase Edge Functions)
 - **Styling**: [Shopify Restyle](https://github.com/Shopify/restyle)
 - **Animation**: [Lottie](https://lottiereactnative.dev/) & [React Native Reanimated](https://docs.swmansion.com/react-native-reanimated/)
 

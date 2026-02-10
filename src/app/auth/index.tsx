@@ -131,7 +131,7 @@ export default function AuthIndex() {
                                         : theme.colors.white,
                                 },
                             ]}
-                            onPress={() => router.push('/main/Home')}
+                            onPress={() => router.push('/auth/register')}
                         >
                             <Text variant="body" color="black">Get Started</Text>
                         </Pressable>

@@ -17,7 +17,7 @@ import ErrorBoundary from '../shared/components/common/ErrorBoundary';
 import GlobalStatusBar from '../shared/components/common/GlobalStatusBar';
 
 export const unstable_settings = {
-  anchor: 'auth',
+  anchor: 'app',
 };
 
 SplashScreen.preventAutoHideAsync();
@@ -63,6 +63,13 @@ export default function RootLayout() {
                   gestureDirection: 'horizontal',
                 }} />
               <Stack.Screen name="main"
+                options={{
+                  headerShown: false,
+                  gestureEnabled: true,
+                  gestureDirection: 'horizontal',
+                }}
+              />
+              <Stack.Screen name="settings"
                 options={{
                   headerShown: false,
                   gestureEnabled: true,
