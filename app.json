@@ -4,13 +4,13 @@
     "slug": "Talki",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./src/assets/images/icon.png",
+    "icon": "./src/assets/images/icons/icon.png",
     "scheme": "talki",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.samer.talki",
+      "bundleIdentifier": "com.michantech.talki",
       "bitcode": "Debug",
       "jsEngine": "hermes",
       "buildNumber": "1",
@@ -22,14 +22,14 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./src/assets/images/android-icon-foreground.png",
-        "backgroundImage": "./src/assets/images/android-icon-background.png",
-        "monochromeImage": "./src/assets/images/android-icon-monochrome.png"
+        "backgroundColor": "#FFFFFF",
+        "foregroundImage": "./src/assets/images/icons/android-icon-foreground.png",
+        "backgroundImage": "./src/assets/images/icons/android-icon-background.png",
+        "monochromeImage": "./src/assets/images/icons/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.samer.talki",
+      "package": "com.michantech.talki",
       "versionCode": 1,
       "permissions": [
         "android.permission.READ_EXTERNAL_STORAGE",
@@ -53,7 +53,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./src/assets/images/splash-icon.png",
+          "image": "./src/assets/images/icons/icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",

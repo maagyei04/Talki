@@ -1,10 +1,12 @@
 import { Box, Text } from '@/src/services/config';
 import { supabase } from '@/src/services/supabase';
+import { useRealtimeTranslation } from '@/src/shared/hooks/useRealtimeTranslation';
 import { useVoiceRecorder } from '@/src/shared/hooks/useVoiceRecorder';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet } from 'react-native';
 import Animated, {
+  FadeInDown,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
@@ -62,22 +64,74 @@ const LANGUAGE_MAP: Record<string, string> = {
   vi: 'Vietnamese',
 };
 
-const getLanguageName = (code: string) => LANGUAGE_MAP[code] || code.toUpperCase();
-
 export default function HomeScreen() {
-  const { isRecording, startRecording, stopRecording, recordingUri } = useVoiceRecorder();
+  // --- State & Hooks ---
+  const [translationMode, setTranslationMode] = useState<'standard' | 'live'>('live');
+  const [targetLang, setTargetLang] = useState<'Arabic' | 'Finnish' | 'English'>('Finnish');
   const [isProcessing, setIsProcessing] = useState(false);
   const [transcription, setTranscription] = useState<Message[]>([]);
   const [detectedLang, setDetectedLang] = useState('Auto-detect');
-  const [targetLang, setTargetLang] = useState<'Arabic' | 'Finnish' | 'English'>('Finnish');
+
+  // Standard Mode Hook
+  const {
+    isRecording: isRecordingStandard,
+    startRecording: startRecordingStandard,
+    stopRecording: stopRecordingStandard,
+    recordingUri
+  } = useVoiceRecorder();
+
+  // Live Mode Hook
+  const {
+    isConnected: isConnectedLive,
+    isSpeaking: isSpeakingLive,
+    transcript: transcriptLive,
+    translation: translationLive,
+    connect: connectLive,
+    disconnect: disconnectLive,
+    isRecording: isRecordingLive
+  } = useRealtimeTranslation(targetLang);
 
   const player = useAudioPlayer();
   const bottomSheetModalRef = useRef<BottomSheetModal>(null);
-
-  // Bottom Sheet Config
   const snapPoints = useMemo(() => ['50%'], []);
   const languages: Array<'Arabic' | 'Finnish' | 'English'> = ['Finnish', 'Arabic', 'English'];
 
+  // --- Animations ---
+  const pulseScale = useSharedValue(1);
+  const liveOpacity = useSharedValue(1);
+
+  useEffect(() => {
+    if (isRecordingStandard || (translationMode === 'live' && isConnectedLive)) {
+      pulseScale.value = withRepeat(
+        withSequence(
+          withTiming(1.15, { duration: 500 }),
+          withTiming(1, { duration: 500 })
+        ),
+        -1,
+        true
+      );
+    } else {
+      pulseScale.value = withTiming(1);
+    }
+  }, [isRecordingStandard, isConnectedLive, translationMode]);
+
+  useEffect(() => {
+    if (translationMode === 'live' && isConnectedLive) {
+      liveOpacity.value = withRepeat(withTiming(0.4, { duration: 800 }), -1, true);
+    } else {
+      liveOpacity.value = 1;
+    }
+  }, [isConnectedLive, translationMode]);
+
+  const pulseStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: pulseScale.value }],
+  }));
+
+  const liveIndicatorStyle = useAnimatedStyle(() => ({
+    opacity: liveOpacity.value
+  }));
+
+  // --- Callbacks ---
   const handlePresentModalPress = useCallback(() => {
     bottomSheetModalRef.current?.present();
   }, []);
@@ -101,7 +155,6 @@ export default function HomeScreen() {
 
   const playTranslation = async (path: string) => {
     try {
-      console.log('Fetching signed URL for:', path);
       const { data, error } = await supabase.storage
         .from('recordings')
         .createSignedUrl(path, 3600);
@@ -117,39 +170,17 @@ export default function HomeScreen() {
     }
   };
 
-  // Pulse animation for the record button
-  const pulseScale = useSharedValue(1);
-
-  useEffect(() => {
-    if (isRecording) {
-      pulseScale.value = withRepeat(
-        withSequence(
-          withTiming(1.15, { duration: 500 }),
-          withTiming(1, { duration: 500 })
-        ),
-        -1,
-        true
-      );
-    } else {
-      pulseScale.value = withTiming(1);
-    }
-  }, [isRecording]);
-
+  // --- Standard Mode Processing ---
   useEffect(() => {
     const processAudio = async () => {
-      if (recordingUri) {
+      if (recordingUri && translationMode === 'standard') {
         try {
           setIsProcessing(true);
-
-          // 1. Get current user
           const { data: { user } } = await supabase.auth.getUser();
           if (!user) throw new Error('Not authenticated');
 
-          // 2. Prepare file for upload
-          // In React Native, we need to handle the file differently for Supabase Storage's fetch
           const fileName = `${Date.now()}.m4a`;
           const filePath = `${user.id}/${fileName}`;
-
           const formData = new FormData();
           formData.append('file', {
             uri: recordingUri,
@@ -157,26 +188,18 @@ export default function HomeScreen() {
             type: 'audio/m4a',
           } as any);
 
-          // 3. Upload to Supabase Storage
           const { error: uploadError } = await supabase.storage
             .from('recordings')
             .upload(filePath, formData);
 
           if (uploadError) throw uploadError;
 
-          console.log('Audio uploaded successfully:', filePath);
-
-          // 4. Call Supabase Edge Function for AI processing
           const { data: edgeData, error: edgeError } = await supabase.functions.invoke('process-audio', {
-            body: {
-              recordPath: filePath,
-              targetLang: targetLang,
-            }
+            body: { recordPath: filePath, targetLang }
           });
 
           if (edgeError) throw edgeError;
 
-          // 5. Update UI and Auto-Play
           if (edgeData.message) {
             const newMessage: Message = {
               id: `${edgeData.message.id}-trans`,
@@ -193,12 +216,8 @@ export default function HomeScreen() {
               timestamp: new Date(edgeData.message.created_at)
             }, newMessage]);
 
-            // Auto-play the new translation
-            if (edgeData.audioUrl) {
-              playTranslation(edgeData.audioUrl);
-            }
+            if (edgeData.audioUrl) playTranslation(edgeData.audioUrl);
           }
-
         } catch (error: any) {
           console.error('Processing failed:', error);
           Alert.alert('Error', error.message || 'Failed to process audio');
@@ -207,53 +226,202 @@ export default function HomeScreen() {
         }
       }
     };
-
     processAudio();
-  }, [recordingUri]);
+  }, [recordingUri, translationMode]);
 
-  const pulseStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: pulseScale.value }],
-  }));
-
+  // --- User Actions ---
   const toggleRecording = async () => {
-    if (isRecording) {
-      await stopRecording();
+    if (translationMode === 'live') {
+      if (isConnectedLive) {
+        await disconnectLive();
+      } else {
+        await connectLive();
+      }
     } else {
-      await startRecording();
+      if (isRecordingStandard) {
+        await stopRecordingStandard();
+      } else {
+        await startRecordingStandard();
+      }
     }
   };
 
+  const toggleMode = async () => {
+    // Stop any active recordings/sessions before switching
+    if (isRecordingStandard) await stopRecordingStandard();
+    if (isConnectedLive) await disconnectLive();
+
+    setTranslationMode(prev => prev === 'standard' ? 'live' : 'standard');
+  };
+
   return (
-    <Box flex={1} backgroundColor="background" paddingTop="xl">
-      {/* Header: Language Display */}
+    <Box flex={1} backgroundColor={translationMode === 'live' ? "black" : "background"}>
+      {/* Header: Controls & Languages */}
       <Box
         flexDirection="row"
         alignItems="center"
         justifyContent="space-between"
         paddingHorizontal="medium"
-        paddingVertical="medium"
-        borderBottomWidth={0.5}
+        paddingTop="xxxl"
+        paddingBottom="medium"
+        borderBottomWidth={translationMode === 'live' ? 0 : 0.5}
         borderBottomColor="borderLight"
+        backgroundColor={translationMode === 'live' ? "rgba(0,0,0,0.8)" : "background"}
       >
-        <Box backgroundColor="backgroundSecondary" style={styles.langDisplay}>
-          <Text variant="caption" color="textSecondary" fontSize={10} marginBottom="nano">DETECTED</Text>
-          <Text variant="subheading" color="text">{detectedLang}</Text>
-        </Box>
-
-        <Box style={styles.arrowContainer}>
-          <Ionicons name="arrow-forward" size={20} color="#420080ff" />
-        </Box>
-
-        <Pressable
-          onPress={handlePresentModalPress}
-          style={[styles.langDisplay, { backgroundColor: '#420080ff' }]}
-        >
-          <Text variant="caption" color="textSecondary" fontSize={10} marginBottom="nano">TARGET</Text>
-          <Box flexDirection="row" alignItems="center">
-            <Text variant="subheading" color="white">{targetLang}</Text>
-            <Ionicons name="chevron-down" size={14} color="gray" style={{ marginLeft: 4 }} />
+        {/* Mode Toggle */}
+        <Pressable onPress={toggleMode} style={styles.modeToggle}>
+          <Box flexDirection="row" alignItems="center" backgroundColor={translationMode === 'live' ? "rgba(255,255,255,0.1)" : "backgroundSecondary"} paddingHorizontal="small" paddingVertical="nano" borderRadius="sm">
+            <MaterialCommunityIcons
+              name={translationMode === 'live' ? "broadcast" : "chat-processing-outline"}
+              size={16}
+              color={translationMode === 'live' ? "#420080ff" : "black"}
+            />
+            <Text variant="caption" color={translationMode === 'live' ? "white" : "text"} fontWeight="bold" marginLeft="nano">
+              {translationMode === 'live' ? "LIVE" : "CHAT"}
+            </Text>
           </Box>
         </Pressable>
+
+        {/* Target Language */}
+        <Pressable
+          onPress={handlePresentModalPress}
+          style={[styles.langDisplay, { backgroundColor: translationMode === 'live' ? "rgba(255,255,255,0.1)" : '#420080ff' }]}
+        >
+          <Box flexDirection="row" alignItems="center">
+            <Text variant="subheading" color={translationMode === 'live' ? "info" : "white"}>{targetLang}</Text>
+            <Ionicons name="chevron-down" size={14} color={translationMode === 'live' ? "white" : "rgba(255,255,255,0.7)"} style={{ marginLeft: 4 }} />
+          </Box>
+        </Pressable>
+      </Box>
+
+      {/* Main Content Area */}
+      {translationMode === 'live' ? (
+        /* LIVE DOCUMENTARY VIEW */
+        <ScrollView contentContainerStyle={styles.liveContent} showsVerticalScrollIndicator={false}>
+          {/* Status Indicator */}
+          <Box flexDirection="row" alignItems="center" marginBottom="xl">
+            <Animated.View style={[styles.liveDot, isConnectedLive && liveIndicatorStyle, !isConnectedLive && { backgroundColor: '#666' }]} />
+            <Text variant="caption" color={isConnectedLive ? "error" : "textSecondary"} fontWeight="bold" marginLeft="nano">
+              {isConnectedLive ? "STREAMING" : "OFFLINE"}
+            </Text>
+          </Box>
+
+          {/* Original Audio (Faded) */}
+          <Box marginBottom="xl" minHeight={80} opacity={0.6}>
+            <Text variant="caption" color="textSecondary" marginBottom="small">ORIGINAL AUDIO</Text>
+            <Text variant="body" color="white" style={styles.liveTranscriptText}>
+              {transcriptLive || (isConnectedLive ? (isRecordingLive ? "Listening..." : "Connecting...") : "Ready for simultaneous flow")}
+            </Text>
+          </Box>
+
+          {/* Translation Output */}
+          <Animated.View entering={FadeInDown.delay(200)} style={styles.liveTranslationContainer}>
+            <Box flexDirection="row" alignItems="center" marginBottom="medium">
+              <MaterialCommunityIcons name="broadcast" size={20} color="#420080ff" />
+              <Text variant="subheading" color="info" marginLeft="small" fontWeight="bold">VOICEOVER</Text>
+            </Box>
+            <Text variant="heading2" color="white" style={styles.liveTranslationText}>
+              {translationLive || (isConnectedLive ? "Translating live..." : "Start session to begin")}
+            </Text>
+          </Animated.View>
+        </ScrollView>
+      ) : (
+        /* STANDARD CHAT VIEW */
+        <ScrollView
+          contentContainerStyle={transcription.length === 0 ? styles.emptyScrollContent : styles.scrollContent}
+          style={styles.scrollView}
+          showsVerticalScrollIndicator={false}
+        >
+          {transcription.length === 0 ? (
+            <Box flex={1} justifyContent="center" alignItems="center" opacity={0.5}>
+              <MaterialCommunityIcons name="microphone-outline" size={64} color="black" />
+              <Text variant="body" marginTop="medium" textAlign="center" color="textSecondary">
+                Tap the button below and speak{'\n'}to start your conversation
+              </Text>
+            </Box>
+          ) : (
+            transcription.map((msg) => (
+              <Box
+                key={msg.id}
+                alignSelf={msg.speaker === 'me' ? 'flex-end' : 'flex-start'}
+                maxWidth="85%"
+                marginBottom="small"
+              >
+                <Pressable
+                  onPress={() => msg.audioPath && playTranslation(msg.audioPath)}
+                  style={({ pressed }) => [{ opacity: pressed && msg.audioPath ? 0.7 : 1 }]}
+                >
+                  <Box
+                    backgroundColor={msg.speaker === 'me' ? 'black' : 'backgroundSecondary'}
+                    padding="medium"
+                    borderRadius="md"
+                    flexDirection="row"
+                    alignItems="center"
+                  >
+                    <Box flexShrink={1}>
+                      <Text variant="body" color={msg.speaker === 'me' ? 'white' : 'text'}>
+                        {msg.text}
+                      </Text>
+                    </Box>
+                    {msg.audioPath && (
+                      <Box marginLeft="small">
+                        <Ionicons
+                          name="volume-medium"
+                          size={20}
+                          color={msg.speaker === 'me' ? 'white' : '#420080ff'}
+                        />
+                      </Box>
+                    )}
+                  </Box>
+                </Pressable>
+              </Box>
+            ))
+          )}
+          {isRecordingStandard && (
+            <Box padding="small" alignSelf="center">
+              <Text variant="caption" color="info" fontWeight="bold">LISTENING...</Text>
+            </Box>
+          )}
+          {isProcessing && (
+            <Box alignSelf="flex-start" maxWidth="85%" marginBottom="small" opacity={0.7}>
+              <Box
+                backgroundColor="backgroundSecondary"
+                padding="medium"
+                borderRadius="md"
+                flexDirection="row"
+                alignItems="center"
+                style={{ borderStyle: 'dashed', borderWidth: 1, borderColor: '#42008033' }}
+              >
+                <ActivityIndicator size="small" color="#420080ff" />
+                <Text variant="body" color="textSecondary" marginLeft="small" style={{ fontStyle: 'italic' }}>
+                  Talki is processing...
+                </Text>
+              </Box>
+            </Box>
+          )}
+        </ScrollView>
+      )}
+
+      {/* Footer: Record Button */}
+      <Box alignItems="center" paddingBottom="xxl" paddingTop="small" style={{ paddingBottom: 110 }}>
+        <Pressable onPress={toggleRecording} disabled={isProcessing}>
+          <Animated.View style={[
+            styles.recordButton,
+            pulseStyle,
+            (isRecordingStandard || isConnectedLive) && styles.recordingActive,
+            isProcessing && styles.buttonDisabled,
+            translationMode === 'live' && { borderColor: isConnectedLive ? '#ff4444' : 'rgba(255,255,255,0.3)', backgroundColor: isConnectedLive ? '#ff4444' : 'transparent' }
+          ]}>
+            <MaterialCommunityIcons
+              name={(isRecordingStandard || isConnectedLive) ? "stop" : "microphone"}
+              size={40}
+              color={(isRecordingStandard || isConnectedLive) ? "white" : (translationMode === 'live' ? "rgba(255,255,255,0.8)" : "black")}
+            />
+          </Animated.View>
+        </Pressable>
+        <Text variant="caption" color={translationMode === 'live' ? "textSecondary" : "textSecondary"} marginTop="small">
+          {translationMode === 'live' ? (isConnectedLive ? "Tap to stop session" : "Tap to start live flow") : (isRecordingStandard ? "Tap to stop" : "Tap to record message")}
+        </Text>
       </Box>
 
       {/* Language Picker Bottom Sheet */}
@@ -301,128 +469,6 @@ export default function HomeScreen() {
           contentContainerStyle={{ padding: 20, paddingBottom: 40 }}
         />
       </BottomSheetModal>
-
-      {/* Transcription Feed */}
-      <ScrollView
-        contentContainerStyle={transcription.length === 0 ? styles.emptyScrollContent : styles.scrollContent}
-        style={styles.scrollView}
-        showsVerticalScrollIndicator={false}
-      >
-        {transcription.length === 0 ? (
-          <Box flex={1} justifyContent="center" alignItems="center" opacity={0.5}>
-            <MaterialCommunityIcons name="microphone-outline" size={64} color="black" />
-            <Text variant="body" marginTop="medium" textAlign="center" color="textSecondary">
-              Tap the button below and speak{'\n'}to start your conversation
-            </Text>
-          </Box>
-        ) : (
-          transcription.map((msg) => (
-            <Box
-              key={msg.id}
-              alignSelf={msg.speaker === 'me' ? 'flex-end' : 'flex-start'}
-              maxWidth="85%"
-              marginBottom="small"
-            >
-              <Pressable
-                onPress={() => msg.audioPath && playTranslation(msg.audioPath)}
-                style={({ pressed }) => [
-                  { opacity: pressed && msg.audioPath ? 0.7 : 1 }
-                ]}
-              >
-                <Box
-                  backgroundColor={msg.speaker === 'me' ? 'black' : 'backgroundSecondary'}
-                  padding="medium"
-                  borderRadius="md"
-                  flexDirection="row"
-                  alignItems="center"
-                >
-                  <Box flexShrink={1}>
-                    <Text
-                      variant="body"
-                      color={msg.speaker === 'me' ? 'white' : 'text'}
-                    >
-                      {msg.text}
-                    </Text>
-                  </Box>
-                  {msg.audioPath && (
-                    <Box marginLeft="small">
-                      <Ionicons
-                        name="volume-medium"
-                        size={20}
-                        color={msg.speaker === 'me' ? 'white' : '#420080ff'}
-                      />
-                    </Box>
-                  )}
-                </Box>
-              </Pressable>
-            </Box>
-          ))
-        )}
-        {isRecording && (
-          <Box padding="small" alignSelf="center">
-            <Text variant="caption" color="info" fontWeight="bold">
-              LISTENING...
-            </Text>
-          </Box>
-        )}
-        {isProcessing && (
-          <Box
-            alignSelf="flex-start"
-            maxWidth="85%"
-            marginBottom="small"
-            opacity={0.7}
-          >
-            <Box
-              backgroundColor="backgroundSecondary"
-              padding="medium"
-              borderRadius="md"
-              flexDirection="row"
-              alignItems="center"
-              style={{ borderStyle: 'dashed', borderWidth: 1, borderColor: '#42008033' }}
-            >
-              <ActivityIndicator size="small" color="#420080ff" />
-              <Text
-                variant="body"
-                color="textSecondary"
-                marginLeft="small"
-                style={{ fontStyle: 'italic' }}
-              >
-                Talki is processing...
-              </Text>
-            </Box>
-          </Box>
-        )}
-      </ScrollView>
-
-      {/* "Smart Actions" */}
-      {/* <Box padding="medium" backgroundColor="backgroundSecondary" marginHorizontal="medium" borderRadius="md" marginBottom="small">
-        <Box flexDirection="row" alignItems="center" marginBottom="nano">
-          <MaterialCommunityIcons name="lightning-bolt" size={16} color="#420080ff" />
-          <Text variant="caption" fontWeight="bold" marginLeft="nano" color="info">SMART ACTIONS</Text>
-        </Box>
-        <Text variant="bodySmall" color="textSecondary">No actions found in this conversation yet.</Text>
-      </Box> */}
-
-      {/* Footer: Record Button */}
-      <Box alignItems="center" paddingBottom="xxl" paddingTop="small" style={{ paddingBottom: 120 }}>
-        <Pressable onPress={toggleRecording} disabled={isProcessing}>
-          <Animated.View style={[
-            styles.recordButton,
-            pulseStyle,
-            isRecording && styles.recordingActive,
-            isProcessing && styles.buttonDisabled
-          ]}>
-            <MaterialCommunityIcons
-              name={isRecording ? "stop" : "microphone"}
-              size={40}
-              color={isRecording ? "white" : (isProcessing ? "gray" : "black")}
-            />
-          </Animated.View>
-        </Pressable>
-        <Text variant="caption" color="textSecondary" marginTop="small">
-          {isRecording ? "Tap to stop" : (isProcessing ? "Processing..." : "Tap to start translating")}
-        </Text>
-      </Box>
     </Box>
   );
 }
@@ -432,16 +478,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 8,
-    minWidth: 120,
-    justifyContent: 'center',
-  },
-  arrowContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#F0F0FF',
+    minWidth: 100,
+    height: 40,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  modeToggle: {
+    height: 40,
+    justifyContent: 'center',
   },
   scrollView: {
     flex: 1,
@@ -454,6 +498,35 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'center',
     padding: 20,
+  },
+  liveContent: {
+    padding: 24,
+    paddingTop: 40,
+    paddingBottom: 100,
+  },
+  liveDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#ff4444',
+  },
+  liveTranscriptText: {
+    fontSize: 18,
+    lineHeight: 26,
+    fontFamily: 'Poppins_400Regular',
+  },
+  liveTranslationContainer: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    padding: 24,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    minHeight: 200,
+  },
+  liveTranslationText: {
+    fontSize: 28,
+    lineHeight: 38,
+    fontWeight: 'bold',
   },
   recordButton: {
     width: 80,
@@ -478,7 +551,7 @@ const styles = StyleSheet.create({
     borderColor: 'gray',
     opacity: 0.5,
   },
-  contentContainer: {
-    flex: 1,
-  },
+  arrowContainer: {
+    display: 'none',
+  }
 });
