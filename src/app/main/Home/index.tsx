@@ -71,6 +71,7 @@ export default function HomeScreen() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [transcription, setTranscription] = useState<Message[]>([]);
   const [detectedLang, setDetectedLang] = useState('Auto-detect');
+  const [showHeadphonePrompt, setShowHeadphonePrompt] = useState(true);
 
   // Standard Mode Hook
   const {
@@ -84,10 +85,13 @@ export default function HomeScreen() {
   const {
     isConnected: isConnectedLive,
     isSpeaking: isSpeakingLive,
+    isPaused: isPausedLive,
     transcript: transcriptLive,
     translation: translationLive,
     connect: connectLive,
     disconnect: disconnectLive,
+    pause: pauseLive,
+    resume: resumeLive,
     isRecording: isRecordingLive
   } = useRealtimeTranslation(targetLang);
 
@@ -133,8 +137,26 @@ export default function HomeScreen() {
 
   // --- Callbacks ---
   const handlePresentModalPress = useCallback(() => {
-    bottomSheetModalRef.current?.present();
-  }, []);
+    if (isConnectedLive && translationMode === 'live') {
+      Alert.alert(
+        'Change Language?',
+        'Changing the language will restart your live session. Continue?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Change',
+            style: 'destructive',
+            onPress: async () => {
+              await disconnectLive();
+              bottomSheetModalRef.current?.present();
+            }
+          }
+        ]
+      );
+    } else {
+      bottomSheetModalRef.current?.present();
+    }
+  }, [isConnectedLive, translationMode, disconnectLive]);
 
   const handleLanguageSelect = useCallback((lang: 'Arabic' | 'Finnish' | 'English') => {
     setTargetLang(lang);
@@ -255,7 +277,7 @@ export default function HomeScreen() {
   };
 
   return (
-    <Box flex={1} backgroundColor={translationMode === 'live' ? "black" : "background"}>
+    <Box flex={1} backgroundColor="background">
       {/* Header: Controls & Languages */}
       <Box
         flexDirection="row"
@@ -264,32 +286,77 @@ export default function HomeScreen() {
         paddingHorizontal="medium"
         paddingTop="xxxl"
         paddingBottom="medium"
-        borderBottomWidth={translationMode === 'live' ? 0 : 0.5}
+        borderBottomWidth={0.5}
         borderBottomColor="borderLight"
-        backgroundColor={translationMode === 'live' ? "rgba(0,0,0,0.8)" : "background"}
+        backgroundColor="background"
       >
-        {/* Mode Toggle */}
-        <Pressable onPress={toggleMode} style={styles.modeToggle}>
-          <Box flexDirection="row" alignItems="center" backgroundColor={translationMode === 'live' ? "rgba(255,255,255,0.1)" : "backgroundSecondary"} paddingHorizontal="small" paddingVertical="nano" borderRadius="sm">
+        {/* Mode Switcher (Segmented Control) */}
+        <Box
+          flexDirection="row"
+          backgroundColor="backgroundSecondary"
+          padding="nano"
+          borderRadius="round"
+          style={styles.segmentedContainer}
+        >
+          <Pressable
+            onPress={() => translationMode !== 'standard' && toggleMode()}
+            style={[
+              styles.segmentButton,
+              translationMode === 'standard' && styles.activeSegment
+            ]}
+          >
             <MaterialCommunityIcons
-              name={translationMode === 'live' ? "broadcast" : "chat-processing-outline"}
-              size={16}
-              color={translationMode === 'live' ? "#420080ff" : "black"}
+              name="chat-processing-outline"
+              size={14}
+              color={translationMode === 'standard' ? "white" : "#64748B"}
             />
-            <Text variant="caption" color={translationMode === 'live' ? "white" : "text"} fontWeight="bold" marginLeft="nano">
-              {translationMode === 'live' ? "LIVE" : "CHAT"}
+            <Text
+              variant="caption"
+              fontWeight="bold"
+              marginLeft="nano"
+              style={[
+                styles.segmentText,
+                translationMode === 'standard' && styles.activeSegmentText
+              ]}
+            >
+              CHAT
             </Text>
-          </Box>
-        </Pressable>
+          </Pressable>
+
+          <Pressable
+            onPress={() => translationMode !== 'live' && toggleMode()}
+            style={[
+              styles.segmentButton,
+              translationMode === 'live' && styles.activeSegment
+            ]}
+          >
+            <MaterialCommunityIcons
+              name="broadcast"
+              size={14}
+              color={translationMode === 'live' ? "white" : "#64748B"}
+            />
+            <Text
+              variant="caption"
+              fontWeight="bold"
+              marginLeft="nano"
+              style={[
+                styles.segmentText,
+                translationMode === 'live' && styles.activeSegmentText
+              ]}
+            >
+              LIVE
+            </Text>
+          </Pressable>
+        </Box>
 
         {/* Target Language */}
         <Pressable
           onPress={handlePresentModalPress}
-          style={[styles.langDisplay, { backgroundColor: translationMode === 'live' ? "rgba(255,255,255,0.1)" : '#420080ff' }]}
+          style={[styles.langDisplay, { backgroundColor: '#420080ff' }]}
         >
           <Box flexDirection="row" alignItems="center">
-            <Text variant="subheading" color={translationMode === 'live' ? "info" : "white"}>{targetLang}</Text>
-            <Ionicons name="chevron-down" size={14} color={translationMode === 'live' ? "white" : "rgba(255,255,255,0.7)"} style={{ marginLeft: 4 }} />
+            <Text variant="subheading" color="white">{targetLang}</Text>
+            <Ionicons name="chevron-down" size={14} color="rgba(255,255,255,0.7)" style={{ marginLeft: 4 }} />
           </Box>
         </Pressable>
       </Box>
@@ -298,18 +365,54 @@ export default function HomeScreen() {
       {translationMode === 'live' ? (
         /* LIVE DOCUMENTARY VIEW */
         <ScrollView contentContainerStyle={styles.liveContent} showsVerticalScrollIndicator={false}>
-          {/* Status Indicator */}
-          <Box flexDirection="row" alignItems="center" marginBottom="xl">
-            <Animated.View style={[styles.liveDot, isConnectedLive && liveIndicatorStyle, !isConnectedLive && { backgroundColor: '#666' }]} />
-            <Text variant="caption" color={isConnectedLive ? "error" : "textSecondary"} fontWeight="bold" marginLeft="nano">
-              {isConnectedLive ? "STREAMING" : "OFFLINE"}
-            </Text>
+          {/* Headphone Recommendation */}
+          {showHeadphonePrompt && (
+            <Animated.View entering={FadeInDown} style={{ marginBottom: 16 }}>
+              <Box
+                padding="medium"
+                borderRadius="md"
+                flexDirection="row"
+                alignItems="center"
+                style={{
+                  backgroundColor: 'rgba(66, 0, 128, 0.1)',
+                  borderWidth: 1,
+                  borderColor: 'rgba(66, 0, 128, 0.2)'
+                }}
+              >
+                <Ionicons name="headset-outline" size={24} color="#420080ff" />
+                <Box flex={1} marginLeft="small">
+                  <Text variant="caption" color="info" fontWeight="bold">
+                    For best results, use headphones or AirPods
+                  </Text>
+                </Box>
+                <Pressable onPress={() => setShowHeadphonePrompt(false)} hitSlop={8}>
+                  <Ionicons name="close-circle" size={20} color="rgba(66, 0, 128, 0.5)" />
+                </Pressable>
+              </Box>
+            </Animated.View>
+          )}
+
+          {/* Status + Speech Indicator */}
+          <Box flexDirection="row" alignItems="center" justifyContent="space-between" marginBottom="xl">
+            <Box flexDirection="row" alignItems="center">
+              <Animated.View style={[styles.liveDot, isConnectedLive && liveIndicatorStyle, !isConnectedLive && { backgroundColor: '#666' }]} />
+              <Text variant="caption" color={isConnectedLive ? "error" : "textSecondary"} fontWeight="bold" marginLeft="nano">
+                {isConnectedLive ? "STREAMING" : "OFFLINE"}
+              </Text>
+            </Box>
+            {/* Speech Detection Indicator */}
+            {isConnectedLive && isSpeakingLive && (
+              <Animated.View entering={FadeInDown} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Animated.View style={[{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#4CAF50', marginRight: 6 }, pulseStyle]} />
+                <Text variant="caption" fontWeight="bold" style={{ color: '#4CAF50' }}>SPEAKING</Text>
+              </Animated.View>
+            )}
           </Box>
 
           {/* Original Audio (Faded) */}
           <Box marginBottom="xl" minHeight={80} opacity={0.6}>
             <Text variant="caption" color="textSecondary" marginBottom="small">ORIGINAL AUDIO</Text>
-            <Text variant="body" color="white" style={styles.liveTranscriptText}>
+            <Text variant="body" color="black" style={styles.liveTranscriptText}>
               {transcriptLive || (isConnectedLive ? (isRecordingLive ? "Listening..." : "Connecting...") : "Ready for simultaneous flow")}
             </Text>
           </Box>
@@ -320,7 +423,7 @@ export default function HomeScreen() {
               <MaterialCommunityIcons name="broadcast" size={20} color="#420080ff" />
               <Text variant="subheading" color="info" marginLeft="small" fontWeight="bold">VOICEOVER</Text>
             </Box>
-            <Text variant="heading2" color="white" style={styles.liveTranslationText}>
+            <Text variant="heading2" color="black" style={styles.liveTranslationText}>
               {translationLive || (isConnectedLive ? "Translating live..." : "Start session to begin")}
             </Text>
           </Animated.View>
@@ -402,8 +505,44 @@ export default function HomeScreen() {
         </ScrollView>
       )}
 
-      {/* Footer: Record Button */}
+      {/* Footer: Record Button + Pause/Resume */}
       <Box alignItems="center" paddingBottom="xxl" paddingTop="small" style={{ paddingBottom: 110 }}>
+        {/* Pause/Resume Button (Live mode only, when connected) */}
+        {translationMode === 'live' && isConnectedLive && (
+          <Pressable
+            onPress={isPausedLive ? resumeLive : pauseLive}
+            style={{ marginBottom: 12 }}
+          >
+            <Box
+              paddingHorizontal="medium"
+              paddingVertical="small"
+              flexDirection="row"
+              alignItems="center"
+              style={{
+                backgroundColor: isPausedLive ? "rgba(76, 175, 80, 0.2)" : "rgba(255, 152, 0, 0.2)",
+                borderWidth: 1,
+                borderColor: isPausedLive ? "rgba(76, 175, 80, 0.4)" : "rgba(255, 152, 0, 0.4)",
+                borderRadius: 999
+              }}
+            >
+              <Ionicons
+                name={isPausedLive ? "play" : "pause"}
+                size={16}
+                color={isPausedLive ? "#4CAF50" : "#FF9800"}
+              />
+              <Text
+                variant="caption"
+                fontWeight="bold"
+                marginLeft="nano"
+                style={{ color: isPausedLive ? "#4CAF50" : "#FF9800" }}
+              >
+                {isPausedLive ? "Resume" : "Pause"}
+              </Text>
+            </Box>
+          </Pressable>
+        )}
+
+        {/* Main Record/Stop Button */}
         <Pressable onPress={toggleRecording} disabled={isProcessing}>
           <Animated.View style={[
             styles.recordButton,
@@ -415,12 +554,16 @@ export default function HomeScreen() {
             <MaterialCommunityIcons
               name={(isRecordingStandard || isConnectedLive) ? "stop" : "microphone"}
               size={40}
-              color={(isRecordingStandard || isConnectedLive) ? "white" : (translationMode === 'live' ? "rgba(255,255,255,0.8)" : "black")}
+              color={(isRecordingStandard || isConnectedLive) ? "white" : (translationMode === 'live' ? "black" : "black")}
             />
           </Animated.View>
         </Pressable>
         <Text variant="caption" color={translationMode === 'live' ? "textSecondary" : "textSecondary"} marginTop="small">
-          {translationMode === 'live' ? (isConnectedLive ? "Tap to stop session" : "Tap to start live flow") : (isRecordingStandard ? "Tap to stop" : "Tap to record message")}
+          {translationMode === 'live'
+            ? (isConnectedLive
+              ? (isPausedLive ? "Session paused • Tap to stop" : "Tap to stop session")
+              : "Tap to start live flow")
+            : (isRecordingStandard ? "Tap to stop" : "Tap to record message")}
         </Text>
       </Box>
 
@@ -501,7 +644,7 @@ const styles = StyleSheet.create({
   },
   liveContent: {
     padding: 24,
-    paddingTop: 40,
+    paddingTop: 30,
     paddingBottom: 100,
   },
   liveDot: {
@@ -516,17 +659,18 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins_400Regular',
   },
   liveTranslationContainer: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(66, 0, 128, 0.05)',
     padding: 24,
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: 'rgba(66, 0, 128, 0.1)',
     minHeight: 200,
   },
   liveTranslationText: {
     fontSize: 28,
     lineHeight: 38,
     fontWeight: 'bold',
+    color: 'black',
   },
   recordButton: {
     width: 80,
@@ -550,6 +694,29 @@ const styles = StyleSheet.create({
   buttonDisabled: {
     borderColor: 'gray',
     opacity: 0.5,
+  },
+  segmentedContainer: {
+    width: 140,
+    height: 36,
+    alignItems: 'center',
+  },
+  segmentButton: {
+    flex: 1,
+    height: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 999,
+  },
+  activeSegment: {
+    backgroundColor: '#420080ff',
+  },
+  segmentText: {
+    color: '#64748B',
+    fontSize: 11,
+  },
+  activeSegmentText: {
+    color: 'white',
   },
   arrowContainer: {
     display: 'none',
