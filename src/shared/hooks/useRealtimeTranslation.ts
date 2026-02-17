@@ -17,6 +17,8 @@ export const useRealtimeTranslation = (targetLang: string) => {
     const pcmBuffer = useRef<Uint8Array>(new Uint8Array(0));
     const isPlaying = useRef(false);
     const currentResponseId = useRef<string | null>(null);
+    const currentItemId = useRef<string | null>(null);
+    const playbackInterval = useRef<NodeJS.Timeout | null>(null);
 
     const connect = async () => {
         try {
@@ -166,7 +168,12 @@ export const useRealtimeTranslation = (targetLang: string) => {
                 switch (message.type) {
                     // USER SPEECH (Input)
                     case 'conversation.item.input_audio_transcription.delta':
-                        setTranscript(prev => prev + message.delta);
+                        if (message.item_id !== currentItemId.current) {
+                            setTranscript(message.delta);
+                            currentItemId.current = message.item_id;
+                        } else {
+                            setTranscript(prev => prev + message.delta);
+                        }
                         break;
                     case 'conversation.item.input_audio_transcription.completed':
                         console.log('User said:', message.transcript);
@@ -192,7 +199,7 @@ export const useRealtimeTranslation = (targetLang: string) => {
 
                     case 'input_audio_buffer.speech_started':
                         setIsSpeaking(true);
-                        setTranscript('');
+                        // REMOVED: setTranscript(''); - Stay on screen until new transcription starts
                         // REMOVED: setTranslation(''); - Stay on screen until new response starts
                         // DON'T clear audio queue/buffer - let translation finish playing
                         break;
@@ -284,16 +291,21 @@ export const useRealtimeTranslation = (targetLang: string) => {
                 player.replace(nextWav);
                 player.play();
 
-                // Monitor for when chunk finishes
-                // reduced from 100ms to 16ms for seamless hand-off
-                const checkFinished = setInterval(() => {
+                if (playbackInterval.current) clearInterval(playbackInterval.current);
+
+                playbackInterval.current = setInterval(() => {
                     if (!player.playing && player.isLoaded) {
-                        clearInterval(checkFinished);
+                        if (playbackInterval.current) {
+                            clearInterval(playbackInterval.current);
+                            playbackInterval.current = null;
+                        }
+                        isPlaying.current = false;
                         playNextInQueue();
                     }
                 }, 16);
             } catch (e) {
                 console.warn('Playback error:', e);
+                isPlaying.current = false;
                 playNextInQueue();
             }
         }
@@ -345,6 +357,10 @@ export const useRealtimeTranslation = (targetLang: string) => {
     };
 
     const disconnect = useCallback(async () => {
+        if (playbackInterval.current) {
+            clearInterval(playbackInterval.current);
+            playbackInterval.current = null;
+        }
         if (ws.current) {
             ws.current.close();
             ws.current = null;
