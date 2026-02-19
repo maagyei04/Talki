@@ -49,12 +49,13 @@ serve(async (req: Request) => {
         const { socket: clientSocket, response } = Deno.upgradeWebSocket(req);
 
         // 4. Connect to OpenAI Realtime API
-        // Using query-param auth as it's most compatible with Deno WebSocket
-        const url = `wss://api.openai.com/v1/realtime?model=gpt-4o-mini-realtime-preview&api_key=${openAiKey}`;
-        const openAiSocket = new WebSocket(url);
-
-        // Explicitly set the beta version via session.update in the client, 
-        // or just rely on the model-based default.
+        // For environments where you cannot set headers, OpenAI supports passing the key as a subprotocol
+        const url = `wss://api.openai.com/v1/realtime?model=gpt-4o-mini-realtime-preview`;
+        const openAiSocket = new WebSocket(url, [
+            'realtime',
+            'openai-insecure-api-key.' + openAiKey,
+            'openai-beta.realtime-v1'
+        ]);
 
         const messageQueue: string[] = [];
         let openAiReady = false;
@@ -108,6 +109,12 @@ serve(async (req: Request) => {
         clientSocket.onmessage = (event: MessageEvent) => {
             try {
                 const data = JSON.parse(event.data);
+
+                // NEW: Handle heartbeats silently at the relay level
+                if (data.type === 'client.heartbeat') {
+                    return;
+                }
+
                 if (data.type !== 'input_audio_buffer.append') {
                     clientMessageCount++;
                     console.log(`Client ${user.id} -> OpenAI (#${clientMessageCount}): ${data.type}`);

@@ -85,13 +85,10 @@ export default function HomeScreen() {
   const {
     isConnected: isConnectedLive,
     isSpeaking: isSpeakingLive,
-    isPaused: isPausedLive,
     transcript: transcriptLive,
     translation: translationLive,
     connect: connectLive,
     disconnect: disconnectLive,
-    pause: pauseLive,
-    resume: resumeLive,
     isRecording: isRecordingLive
   } = useRealtimeTranslation(targetLang);
 
@@ -505,43 +502,8 @@ export default function HomeScreen() {
         </ScrollView>
       )}
 
-      {/* Footer: Record Button + Pause/Resume */}
+      {/* Footer: Record Button */}
       <Box alignItems="center" paddingBottom="xxl" paddingTop="small" style={{ paddingBottom: 110 }}>
-        {/* Pause/Resume Button (Live mode only, when connected) */}
-        {translationMode === 'live' && isConnectedLive && (
-          <Pressable
-            onPress={isPausedLive ? resumeLive : pauseLive}
-            style={{ marginBottom: 12 }}
-          >
-            <Box
-              paddingHorizontal="medium"
-              paddingVertical="small"
-              flexDirection="row"
-              alignItems="center"
-              style={{
-                backgroundColor: isPausedLive ? "rgba(76, 175, 80, 0.2)" : "rgba(255, 152, 0, 0.2)",
-                borderWidth: 1,
-                borderColor: isPausedLive ? "rgba(76, 175, 80, 0.4)" : "rgba(255, 152, 0, 0.4)",
-                borderRadius: 999
-              }}
-            >
-              <Ionicons
-                name={isPausedLive ? "play" : "pause"}
-                size={16}
-                color={isPausedLive ? "#4CAF50" : "#FF9800"}
-              />
-              <Text
-                variant="caption"
-                fontWeight="bold"
-                marginLeft="nano"
-                style={{ color: isPausedLive ? "#4CAF50" : "#FF9800" }}
-              >
-                {isPausedLive ? "Resume" : "Pause"}
-              </Text>
-            </Box>
-          </Pressable>
-        )}
-
         {/* Main Record/Stop Button */}
         <Pressable onPress={toggleRecording} disabled={isProcessing}>
           <Animated.View style={[
@@ -560,9 +522,7 @@ export default function HomeScreen() {
         </Pressable>
         <Text variant="caption" color={translationMode === 'live' ? "textSecondary" : "textSecondary"} marginTop="small">
           {translationMode === 'live'
-            ? (isConnectedLive
-              ? (isPausedLive ? "Session paused • Tap to stop" : "Tap to stop session")
-              : "Tap to start live flow")
+            ? (isConnectedLive ? "Tap to stop session" : "Tap to start live flow")
             : (isRecordingStandard ? "Tap to stop" : "Tap to record message")}
         </Text>
       </Box>
