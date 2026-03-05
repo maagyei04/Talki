@@ -10,7 +10,7 @@ export default function NotFoundScreen() {
       <Stack.Screen options={{ title: '404 Error', headerShown: false }} />
       <Box flex={1} backgroundColor="background" style={styles.container}>
         <Image
-          source={require('@/src/assets/images/icon.png')}
+          source={require('@/src/assets/images/icons/icon.png')}
           style={styles.logo}
         />
         <Text variant="subheading3" color="text" marginVertical="large" textAlign="center">

@@ -93,15 +93,15 @@ export const SplashAnimation = () => {
                     },
                     {
                         keypath: "bg green",
-                        color: "#000000ed"
+                        color: "#420080ff"
                     },
                     {
                         keypath: "bg green 2",
-                        color: "#aaaaaaca"
+                        color: "#4200805a"
                     },
                     {
                         keypath: "BaseCircle_03",
-                        color: "#ffffffb6"
+                        color: "#4200801c"
                     }
                 ]}
             />
@@ -170,7 +170,7 @@ const styles = StyleSheet.create({
     },
     subText: {
         fontSize: 15,
-        color: '#494949FF',
+        color: '#ffffffff',
         fontWeight: '500',
         textShadowColor: 'rgba(0, 0, 0, 0.2)',
         textShadowOffset: { width: 1, height: 1 },
