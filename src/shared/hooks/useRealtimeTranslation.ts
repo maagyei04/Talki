@@ -40,8 +40,8 @@ export const useRealtimeTranslation = (langA: string, langB: string) => {
 
     const playChime = async () => {
         try {
-            const soundUrl = 'https://www.soundjay.com/buttons/button-09a.mp3';
-            const { sound } = await Audio.Sound.createAsync({ uri: soundUrl }, { shouldPlay: true, volume: 0.4 });
+            const soundAsset = require('@assets/audio/blip.mp3');
+            const { sound } = await Audio.Sound.createAsync(soundAsset, { shouldPlay: true, volume: 0.4 });
             sound.setOnPlaybackStatusUpdate((status) => {
                 if (status.isLoaded && status.didJustFinish) {
                     sound.unloadAsync();
