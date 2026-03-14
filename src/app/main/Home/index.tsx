@@ -64,14 +64,22 @@ const LANGUAGE_MAP: Record<string, string> = {
   vi: 'Vietnamese',
 };
 
+const LANG_ABBREVIATIONS: Record<string, string> = {
+  Arabic: 'AR',
+  Finnish: 'FI',
+  English: 'EN',
+};
+
 export default function HomeScreen() {
   // --- State & Hooks ---
   const [translationMode, setTranslationMode] = useState<'standard' | 'live'>('live');
-  const [targetLang, setTargetLang] = useState<'Arabic' | 'Finnish' | 'English'>('Finnish');
+  const [langA, setLangA] = useState<'Arabic' | 'Finnish' | 'English'>('English');
+  const [langB, setLangB] = useState<'Arabic' | 'Finnish' | 'English'>('Arabic');
   const [isProcessing, setIsProcessing] = useState(false);
   const [transcription, setTranscription] = useState<Message[]>([]);
   const [detectedLang, setDetectedLang] = useState('Auto-detect');
   const [showHeadphonePrompt, setShowHeadphonePrompt] = useState(true);
+  const [pickingLangType, setPickingLangType] = useState<'A' | 'B'>('B');
 
   // Standard Mode Hook
   const {
@@ -90,7 +98,7 @@ export default function HomeScreen() {
     connect: connectLive,
     disconnect: disconnectLive,
     isRecording: isRecordingLive
-  } = useRealtimeTranslation(targetLang);
+  } = useRealtimeTranslation(langA, langB);
 
   const player = useAudioPlayer();
   const bottomSheetModalRef = useRef<BottomSheetModal>(null);
@@ -133,7 +141,8 @@ export default function HomeScreen() {
   }));
 
   // --- Callbacks ---
-  const handlePresentModalPress = useCallback(() => {
+  const handlePresentModalPress = useCallback((type: 'A' | 'B') => {
+    setPickingLangType(type);
     if (isConnectedLive && translationMode === 'live') {
       Alert.alert(
         'Change Language?',
@@ -156,9 +165,10 @@ export default function HomeScreen() {
   }, [isConnectedLive, translationMode, disconnectLive]);
 
   const handleLanguageSelect = useCallback((lang: 'Arabic' | 'Finnish' | 'English') => {
-    setTargetLang(lang);
+    if (pickingLangType === 'A') setLangA(lang);
+    else setLangB(lang);
     bottomSheetModalRef.current?.dismiss();
-  }, []);
+  }, [pickingLangType]);
 
   const renderBackdrop = useCallback(
     (props: any) => (
@@ -214,7 +224,7 @@ export default function HomeScreen() {
           if (uploadError) throw uploadError;
 
           const { data: edgeData, error: edgeError } = await supabase.functions.invoke('process-audio', {
-            body: { recordPath: filePath, targetLang }
+            body: { recordPath: filePath, targetLang: langB }
           });
 
           if (edgeError) throw edgeError;
@@ -346,16 +356,50 @@ export default function HomeScreen() {
           </Pressable>
         </Box>
 
-        {/* Target Language */}
-        <Pressable
-          onPress={handlePresentModalPress}
-          style={[styles.langDisplay, { backgroundColor: '#420080ff' }]}
-        >
+        {/* Dynamic Header Picker */}
+        {translationMode === 'live' ? (
+          /* Dual Language Header (LIVE) */
           <Box flexDirection="row" alignItems="center">
-            <Text variant="subheading" color="white">{targetLang}</Text>
-            <Ionicons name="chevron-down" size={14} color="rgba(255,255,255,0.7)" style={{ marginLeft: 4 }} />
+            <Pressable
+              onPress={() => handlePresentModalPress('A')}
+              style={[styles.langDisplay, { backgroundColor: '#420080ff', minWidth: 60 }]}
+            >
+              <Box flexDirection="row" alignItems="center">
+                <Text variant="subheading" color="white" fontWeight="bold">
+                  {LANG_ABBREVIATIONS[langA] || langA.substring(0, 2).toUpperCase()}
+                </Text>
+                <Ionicons name="chevron-down" size={12} color="rgba(255,255,255,0.7)" style={{ marginLeft: 4 }} />
+              </Box>
+            </Pressable>
+
+            <Box marginHorizontal="small">
+              <Ionicons name="swap-horizontal" size={16} color="#64748B" />
+            </Box>
+
+            <Pressable
+              onPress={() => handlePresentModalPress('B')}
+              style={[styles.langDisplay, { backgroundColor: '#420080ff', minWidth: 60 }]}
+            >
+              <Box flexDirection="row" alignItems="center">
+                <Text variant="subheading" color="white" fontWeight="bold">
+                  {LANG_ABBREVIATIONS[langB] || langB.substring(0, 2).toUpperCase()}
+                </Text>
+                <Ionicons name="chevron-down" size={12} color="rgba(255,255,255,0.7)" style={{ marginLeft: 4 }} />
+              </Box>
+            </Pressable>
           </Box>
-        </Pressable>
+        ) : (
+          /* Single Language Header (CHAT/STANDARD) */
+          <Pressable
+            onPress={() => handlePresentModalPress('B')}
+            style={[styles.langDisplay, { backgroundColor: '#420080ff' }]}
+          >
+            <Box flexDirection="row" alignItems="center">
+              <Text variant="subheading" color="white">{langB}</Text>
+              <Ionicons name="chevron-down" size={14} color="rgba(255,255,255,0.7)" style={{ marginLeft: 4 }} />
+            </Box>
+          </Pressable>
+        )}
       </Box>
 
       {/* Main Content Area */}
@@ -544,31 +588,34 @@ export default function HomeScreen() {
               Select Target Language
             </Text>
           )}
-          renderItem={({ item }: { item: 'Arabic' | 'Finnish' | 'English' }) => (
-            <Pressable onPress={() => handleLanguageSelect(item)}>
-              <Box
-                flexDirection="row"
-                alignItems="center"
-                justifyContent="space-between"
-                paddingVertical="medium"
-                paddingHorizontal="medium"
-                backgroundColor={targetLang === item ? 'backgroundTertiary' : 'transparent'}
-                borderRadius="md"
-                marginBottom="small"
-              >
-                <Text
-                  variant="body"
-                  color={targetLang === item ? 'info' : 'text'}
-                  fontWeight={targetLang === item ? 'bold' : 'normal'}
+          renderItem={({ item }: { item: 'Arabic' | 'Finnish' | 'English' }) => {
+            const currentSelected = pickingLangType === 'A' ? langA : langB;
+            return (
+              <Pressable onPress={() => handleLanguageSelect(item)}>
+                <Box
+                  flexDirection="row"
+                  alignItems="center"
+                  justifyContent="space-between"
+                  paddingVertical="medium"
+                  paddingHorizontal="medium"
+                  backgroundColor={currentSelected === item ? 'backgroundTertiary' : 'transparent'}
+                  borderRadius="md"
+                  marginBottom="small"
                 >
-                  {item}
-                </Text>
-                {targetLang === item && (
-                  <Ionicons name="checkmark-circle" size={20} color="#420080ff" />
-                )}
-              </Box>
-            </Pressable>
-          )}
+                  <Text
+                    variant="body"
+                    color={currentSelected === item ? 'info' : 'text'}
+                    fontWeight={currentSelected === item ? 'bold' : 'normal'}
+                  >
+                    {item}
+                  </Text>
+                  {currentSelected === item && (
+                    <Ionicons name="checkmark-circle" size={20} color="#420080ff" />
+                  )}
+                </Box>
+              </Pressable>
+            );
+          }}
           contentContainerStyle={{ padding: 20, paddingBottom: 40 }}
         />
       </BottomSheetModal>

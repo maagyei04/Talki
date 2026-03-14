@@ -1,6 +1,8 @@
 import { supabase } from '@/src/services/supabase';
 import { useAudioRecorder } from '@siteed/expo-audio-studio';
-import * as Speech from 'expo-speech';
+import { Audio } from 'expo-av';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Haptics from 'expo-haptics';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 interface WebSocketMessage {
@@ -11,7 +13,7 @@ interface WebSocketMessage {
     [key: string]: any;
 }
 
-export const useRealtimeTranslation = (targetLang: string) => {
+export const useRealtimeTranslation = (langA: string, langB: string) => {
     const [isConnected, setIsConnected] = useState(false);
     const [transcript, setTranscript] = useState('');
     const [translation, setTranslation] = useState('');
@@ -20,14 +22,15 @@ export const useRealtimeTranslation = (targetLang: string) => {
     const ws = useRef<WebSocket | null>(null);
     const { startRecording, stopRecording, isRecording } = useAudioRecorder();
 
-    // TTS state
+    // Audio & State tracking
     const isAISpeaking = useRef(false);
-    const speechQueue = useRef<string[]>([]);
-    const textBuffer = useRef('');
+    const audioDeltas = useRef<string[]>([]);
+    const audioPlayer = useRef<Audio.Sound | null>(null);
 
     // ID tracking
     const currentResponseId = useRef<string | null>(null);
     const currentItemId = useRef<string | null>(null);
+    const textBuffer = useRef('');
 
     // Connection
     const heartbeatInterval = useRef<NodeJS.Timeout | null>(null);
@@ -35,7 +38,84 @@ export const useRealtimeTranslation = (targetLang: string) => {
     const reconnectTimer = useRef<NodeJS.Timeout | null>(null);
     const sessionToken = useRef<string | null>(null);
 
-    // --- Helpers ---
+    const playChime = async () => {
+        try {
+            const soundUrl = 'https://www.soundjay.com/buttons/button-09a.mp3';
+            const { sound } = await Audio.Sound.createAsync({ uri: soundUrl }, { shouldPlay: true, volume: 0.4 });
+            sound.setOnPlaybackStatusUpdate((status) => {
+                if (status.isLoaded && status.didJustFinish) {
+                    sound.unloadAsync();
+                }
+            });
+        } catch (err) {
+            console.error('Chime failed:', err);
+        }
+    };
+
+    const playOpenAIAudio = async () => {
+        if (audioDeltas.current.length === 0) return;
+        isAISpeaking.current = true;
+
+        try {
+            // Concatenate base64 deltas
+            const fullBase64 = audioDeltas.current.join('');
+            audioDeltas.current = []; // Clear for next run
+
+            // Create WAV header for PCM16 24kHz Mono
+            const writeWavHeader = (length: number) => {
+                const buffer = new ArrayBuffer(44);
+                const view = new DataView(buffer);
+                const writeString = (offset: number, string: string) => {
+                    for (let i = 0; i < string.length; i++) {
+                        view.setUint8(offset + i, string.charCodeAt(i));
+                    }
+                };
+                writeString(0, 'RIFF');
+                view.setUint32(4, 36 + length, true);
+                writeString(8, 'WAVE');
+                writeString(12, 'fmt ');
+                view.setUint32(16, 16, true);
+                view.setUint16(20, 1, true); // PCM
+                view.setUint16(22, 1, true); // Mono
+                view.setUint32(24, 24000, true); // Sample Rate (OpenAI default)
+                view.setUint32(28, 24000 * 2, true); // Byte Rate
+                view.setUint16(32, 2, true); // Block Align
+                view.setUint16(34, 16, true); // Bits per sample
+                writeString(36, 'data');
+                view.setUint32(40, length, true);
+                return buffer;
+            };
+
+            const binaryString = atob(fullBase64);
+            const pcmLength = binaryString.length;
+            const headerBuffer = writeWavHeader(pcmLength);
+
+            const fullBuffer = new Uint8Array(44 + pcmLength);
+            fullBuffer.set(new Uint8Array(headerBuffer), 0);
+            for (let i = 0; i < pcmLength; i++) {
+                fullBuffer[44 + i] = binaryString.charCodeAt(i);
+            }
+
+            const base64Wav = uint8ArrayToBase64(fullBuffer);
+            const cacheDir = FileSystem.cacheDirectory || FileSystem.documentDirectory;
+            const fileUri = `${cacheDir}speech_${Date.now()}.wav`;
+            await FileSystem.writeAsStringAsync(fileUri, base64Wav, { encoding: FileSystem.EncodingType.Base64 });
+
+            const { sound } = await Audio.Sound.createAsync({ uri: fileUri }, { shouldPlay: true });
+            audioPlayer.current = sound;
+
+            sound.setOnPlaybackStatusUpdate(async (status) => {
+                if (status.isLoaded && status.didJustFinish) {
+                    isAISpeaking.current = false;
+                    await sound.unloadAsync();
+                    playChime(); // Play chime after audio finishes
+                }
+            });
+        } catch (error) {
+            console.error('Playback error:', error);
+            isAISpeaking.current = false;
+        }
+    };
 
     const uint8ArrayToBase64 = (uint8Array: Uint8Array): string => {
         const CHUNK = 8192;
@@ -47,47 +127,17 @@ export const useRealtimeTranslation = (targetLang: string) => {
         return btoa(binary);
     };
 
-    // --- TTS Engine (expo-speech / AVSpeechSynthesizer) ---
-    // Completely independent from AVAudioSession — mic never stops!
-
-    const speakNextInQueue = () => {
-        if (isAISpeaking.current || speechQueue.current.length === 0) return;
-
-        const sentence = speechQueue.current.shift()!;
-        isAISpeaking.current = true;
-        console.log('🔊 Speaking:', sentence.substring(0, 40) + (sentence.length > 40 ? '...' : ''));
-
-        Speech.speak(sentence, {
-            language: targetLang,
-            rate: 1.0,
-            onStart: () => { isAISpeaking.current = true; },
-            onDone: () => {
-                console.log('✅ Speech done');
-                isAISpeaking.current = false;
-                speakNextInQueue(); // process next sentence
-            },
-            onError: () => {
-                console.error('Speech error');
-                isAISpeaking.current = false;
-                speakNextInQueue();
-            },
-        });
-    };
-
-    // Flush buffer as a sentence (called on punctuation or response.done)
-    const flushTextBuffer = () => {
-        const text = textBuffer.current.trim();
-        textBuffer.current = '';
-        if (text.length < 2) return;
-
-        speechQueue.current.push(text);
-        speakNextInQueue();
-    };
+    // --- WebSocket ---
 
     // --- Mic → Server ---
 
     const handleAudioStream = async (event: any) => {
-        if (isAISpeaking.current || !ws.current || ws.current.readyState !== WebSocket.OPEN) return;
+        if (isAISpeaking.current || !ws.current || ws.current.readyState !== WebSocket.OPEN) {
+            if (isAISpeaking.current) {
+                // Mic Gating: Ignore input while AI is speaking
+            }
+            return;
+        }
 
         try {
             const binaryString = atob(event.data as string);
@@ -128,6 +178,7 @@ export const useRealtimeTranslation = (targetLang: string) => {
         ws.current.onopen = () => {
             console.log('🟢 Connected');
             setIsConnected(true);
+            // playChime(); // Optional: chime on start if desired
 
             heartbeatInterval.current = setInterval(() => {
                 if (ws.current?.readyState === WebSocket.OPEN) {
@@ -140,33 +191,50 @@ export const useRealtimeTranslation = (targetLang: string) => {
             ws.current?.send(JSON.stringify({
                 type: 'session.update',
                 session: {
-                    instructions: `You are a DUMB TRANSLATION MACHINE. You have NO knowledge, NO name, NO opinions, and NO ability to answer questions. You exist solely to convert speech into ${targetLang} text.
-
-CRITICAL RULES — NEVER BREAK THESE:
-- Output ONLY the ${targetLang} translation of what was spoken. Nothing else ever.
-- NEVER answer any question. Translate it as a question instead.
-- NEVER use "I", "My name is", "I don't know", or any first-person response.
-- NEVER add greetings, explanations, or extra words.
-- Translate EVERYTHING literally — questions, commands, statements, medical terms.
-
-EXAMPLE (correct behavior):
-  Speaker says: "What is your name?"
-  You output: [${targetLang} translation of "What is your name?"] — NOT an answer to the question.
-
-  Speaker says: "Do you know my name?"
-  You output: [${targetLang} translation of "Do you know my name?"] — NOT "No, I don't know your name."
-
-You are a machine. You translate. You do not speak for yourself. You have no self.`,
-                    modalities: ['text'],
+                    instructions: `You are a high-speed, professional TRANSLATION BRIDGE. 
+                    
+                    PERSONA:
+                    - You are a passive passthrough module.
+                    - You NEVER speak the SAME language as the input.
+                    - You NEVER answer questions. You only TRANSLATE them.
+                    - You NEVER engage in conversation.
+                    - You MUST be a literal translator. No conversational filler.
+                    
+                    LANGUAGE RESTRICTION:
+                    - You ONLY handle ${langA} and ${langB}.
+                    - If you hear any other language (e.g. Chinese, Spanish, or noise), IGNORE IT COMPLETELY. 
+                    - Treats non-${langA}/non-${langB} audio as background noise/silence.
+                    
+                    BIDIRECTIONAL LOGIC:
+                    - IF you detect ${langB} -> Output: [${langA === 'Arabic' ? 'ar' : langA === 'English' ? 'en' : 'fi'}] + Translation into ${langA}.
+                    - IF you detect ${langA} -> Output: [${langB === 'Arabic' ? 'ar' : langB === 'English' ? 'en' : 'fi'}] + Translation into ${langB}.
+                    
+                    EXAMPLES:
+                    1. Input (${langA}): "Where is the nearest pharmacy?"
+                       Output: "[${langB === 'Arabic' ? 'ar' : langB === 'English' ? 'en' : 'fi'}] Precise translation into ${langB}"
+                    2. Input (${langB}): "My stomach hurts."
+                       Output: "[${langA === 'Arabic' ? 'ar' : langA === 'English' ? 'en' : 'fi'}] Precise translation into ${langA}"
+                    3. Input (Question): "What is your name?"
+                       Output: "[TargetCode] Translation of 'What is your name?' into target language"
+                    
+                    CRITICAL: 
+                    - Output ONLY the bracketed code followed by the translation.
+                    - DO NOT provide help, DO NOT answer questions, DO NOT provide medical advice.
+                    - TRANSLATE EVERYTHING LITERALLY.
+                    `,
+                    modalities: ['text', 'audio'],
+                    voice: 'shimmer',
                     temperature: 0.6,
                     turn_detection: {
                         type: 'server_vad',
-                        threshold: 0.5,
+                        threshold: 0.6, // Increased to ignore more background noise
                         prefix_padding_ms: 300,
-                        silence_duration_ms: 500
+                        silence_duration_ms: 1000
                     },
                     input_audio_format: 'pcm16',
-                    input_audio_transcription: { model: 'whisper-1' }
+                    input_audio_transcription: {
+                        model: 'whisper-1'
+                    }
                 }
             }));
         };
@@ -185,42 +253,53 @@ You are a machine. You translate. You do not speak for yourself. You have no sel
                     }
                     break;
 
-                // Translation text coming in chunk by chunk
+                case 'conversation.item.input_audio_transcription.completed':
+                    console.log('Detected transcription:', msg.transcript);
+                    setTranscript(msg.transcript || '');
+                    break;
+
                 case 'response.text.delta':
+                case 'response.audio_transcript.delta':
                     if (msg.response_id !== currentResponseId.current) {
                         currentResponseId.current = msg.response_id || null;
-                        textBuffer.current = msg.delta || '';
                         setTranslation(msg.delta || '');
                     } else {
-                        textBuffer.current += msg.delta || '';
                         setTranslation(prev => prev + (msg.delta || ''));
                     }
-
-                    // Flush on sentence-ending punctuation for low-latency TTS
-                    if (textBuffer.current.match(/[.!?;]\s*$/)) {
-                        flushTextBuffer();
-                    }
                     break;
 
-                // End of response — flush anything remaining
-                case 'response.text.done':
-                    if (textBuffer.current.trim().length > 0) {
-                        flushTextBuffer();
-                    }
+                case 'response.audio_transcript.completed':
+                    setTranslation(msg.transcript || '');
                     break;
 
-                case 'response.done':
-                    if (textBuffer.current.trim().length > 0) {
-                        flushTextBuffer();
-                    }
+                case 'response.audio.delta':
+                    if (msg.delta) audioDeltas.current.push(msg.delta);
+                    break;
+
+                case 'response.audio.done':
+                    playOpenAIAudio(); // Play the accumulated audio
                     break;
 
                 case 'input_audio_buffer.speech_started':
                     setIsSpeaking(true);
+                    setTranscript(''); // Clear previous for a fresh 'Live' feel
+                    setTranslation('');
+                    audioDeltas.current = []; // Clear any stale audio deltas
+                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                    // If AI is still speaking from previous turn, stop it
+                    if (audioPlayer.current) {
+                        audioPlayer.current.stopAsync().catch(() => { });
+                        isAISpeaking.current = false;
+                    }
                     break;
 
                 case 'input_audio_buffer.speech_stopped':
                     setIsSpeaking(false);
+                    Haptics.selectionAsync();
+                    break;
+
+                case 'response.done':
+                    // Final cleanup or state reset if needed
                     break;
 
                 case 'error':
@@ -299,11 +378,13 @@ You are a machine. You translate. You do not speak for yourself. You have no sel
         if (heartbeatInterval.current) { clearInterval(heartbeatInterval.current); heartbeatInterval.current = null; }
         if (reconnectTimer.current) { clearTimeout(reconnectTimer.current); reconnectTimer.current = null; }
 
-        // Stop TTS if speaking
-        try { Speech.stop(); } catch { }
-        speechQueue.current = [];
-        textBuffer.current = '';
+        if (audioPlayer.current) {
+            try { await audioPlayer.current.stopAsync(); await audioPlayer.current.unloadAsync(); } catch { }
+            audioPlayer.current = null;
+        }
+
         isAISpeaking.current = false;
+        audioDeltas.current = [];
 
         if (ws.current) { ws.current.close(); ws.current = null; }
         try { await stopRecording(); } catch { }

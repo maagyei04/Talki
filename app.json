@@ -7,7 +7,6 @@
     "icon": "./src/assets/images/icons/icon.png",
     "scheme": "talki",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.michantech.talki",
@@ -27,7 +26,6 @@
         "backgroundImage": "./src/assets/images/icons/android-icon-background.png",
         "monochromeImage": "./src/assets/images/icons/android-icon-monochrome.png"
       },
-      "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.michantech.talki",
       "versionCode": 1,
@@ -46,7 +44,7 @@
     },
     "web": {
       "output": "static",
-      "favicon": "./src/assets/images/favicon.png"
+      "favicon": "./src/assets/images/icons/icon.png"
     },
     "plugins": [
       "expo-router",
