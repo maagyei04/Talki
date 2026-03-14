@@ -78,7 +78,6 @@ export default function HomeScreen() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [transcription, setTranscription] = useState<Message[]>([]);
   const [detectedLang, setDetectedLang] = useState('Auto-detect');
-  const [showHeadphonePrompt, setShowHeadphonePrompt] = useState(true);
   const [pickingLangType, setPickingLangType] = useState<'A' | 'B'>('B');
 
   // Standard Mode Hook
@@ -406,32 +405,6 @@ export default function HomeScreen() {
       {translationMode === 'live' ? (
         /* LIVE DOCUMENTARY VIEW */
         <ScrollView contentContainerStyle={styles.liveContent} showsVerticalScrollIndicator={false}>
-          {/* Headphone Recommendation */}
-          {showHeadphonePrompt && (
-            <Animated.View entering={FadeInDown} style={{ marginBottom: 16 }}>
-              <Box
-                padding="medium"
-                borderRadius="md"
-                flexDirection="row"
-                alignItems="center"
-                style={{
-                  backgroundColor: 'rgba(66, 0, 128, 0.1)',
-                  borderWidth: 1,
-                  borderColor: 'rgba(66, 0, 128, 0.2)'
-                }}
-              >
-                <Ionicons name="headset-outline" size={24} color="#420080ff" />
-                <Box flex={1} marginLeft="small">
-                  <Text variant="caption" color="info" fontWeight="bold">
-                    For best results, use headphones or AirPods
-                  </Text>
-                </Box>
-                <Pressable onPress={() => setShowHeadphonePrompt(false)} hitSlop={8}>
-                  <Ionicons name="close-circle" size={20} color="rgba(66, 0, 128, 0.5)" />
-                </Pressable>
-              </Box>
-            </Animated.View>
-          )}
 
           {/* Status + Speech Indicator */}
           <Box flexDirection="row" alignItems="center" justifyContent="space-between" marginBottom="xl">

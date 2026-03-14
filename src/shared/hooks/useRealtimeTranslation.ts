@@ -42,13 +42,16 @@ export const useRealtimeTranslation = (langA: string, langB: string) => {
         try {
             const soundAsset = require('@assets/audio/blip.mp3');
             const { sound } = await Audio.Sound.createAsync(soundAsset, { shouldPlay: true, volume: 0.4 });
+            isAISpeaking.current = true; // Lock mic while chime is playing
             sound.setOnPlaybackStatusUpdate((status) => {
                 if (status.isLoaded && status.didJustFinish) {
                     sound.unloadAsync();
+                    isAISpeaking.current = false; // Unlock only after chime is done
                 }
             });
         } catch (err) {
             console.error('Chime failed:', err);
+            isAISpeaking.current = false;
         }
     };
 
@@ -195,6 +198,8 @@ export const useRealtimeTranslation = (langA: string, langB: string) => {
                     
                     PERSONA:
                     - You are a passive passthrough module.
+                    - When speaking ${langA}, you take on the identity of a NATIVE ${langA} speaker with a perfect, natural regional accent.
+                    - When speaking ${langB}, you take on the identity of a NATIVE ${langB} speaker with a perfect, natural regional accent.
                     - You NEVER speak the SAME language as the input.
                     - You NEVER answer questions. You only TRANSLATE them.
                     - You NEVER engage in conversation.
@@ -206,19 +211,20 @@ export const useRealtimeTranslation = (langA: string, langB: string) => {
                     - Treats non-${langA}/non-${langB} audio as background noise/silence.
                     
                     BIDIRECTIONAL LOGIC:
-                    - IF you detect ${langB} -> Output: [${langA === 'Arabic' ? 'ar' : langA === 'English' ? 'en' : 'fi'}] + Translation into ${langA}.
-                    - IF you detect ${langA} -> Output: [${langB === 'Arabic' ? 'ar' : langB === 'English' ? 'en' : 'fi'}] + Translation into ${langB}.
+                    - IF you detect ${langB} -> Translate into ${langA}.
+                    - IF you detect ${langA} -> Translate into ${langB}.
                     
                     EXAMPLES:
                     1. Input (${langA}): "Where is the nearest pharmacy?"
-                       Output: "[${langB === 'Arabic' ? 'ar' : langB === 'English' ? 'en' : 'fi'}] Precise translation into ${langB}"
+                       Output: "(Precise translation into ${langB})"
                     2. Input (${langB}): "My stomach hurts."
-                       Output: "[${langA === 'Arabic' ? 'ar' : langA === 'English' ? 'en' : 'fi'}] Precise translation into ${langA}"
+                       Output: "(Precise translation into ${langA})"
                     3. Input (Question): "What is your name?"
-                       Output: "[TargetCode] Translation of 'What is your name?' into target language"
+                       Output: "Translation of 'What is your name?' into target language"
                     
                     CRITICAL: 
-                    - Output ONLY the bracketed code followed by the translation.
+                    - Output ONLY the plain translation.
+                    - NEVER include language tags, brackets, or codes like [en] or [ar] in your response.
                     - DO NOT provide help, DO NOT answer questions, DO NOT provide medical advice.
                     - TRANSLATE EVERYTHING LITERALLY.
                     `,
@@ -227,13 +233,14 @@ export const useRealtimeTranslation = (langA: string, langB: string) => {
                     temperature: 0.6,
                     turn_detection: {
                         type: 'server_vad',
-                        threshold: 0.6, // Increased to ignore more background noise
+                        threshold: 0.6,
                         prefix_padding_ms: 300,
                         silence_duration_ms: 1000
                     },
                     input_audio_format: 'pcm16',
                     input_audio_transcription: {
-                        model: 'whisper-1'
+                        model: 'whisper-1',
+                        language: (langA === 'English' || langB === 'English') ? 'en' : undefined
                     }
                 }
             }));
@@ -269,7 +276,9 @@ export const useRealtimeTranslation = (langA: string, langB: string) => {
                     break;
 
                 case 'response.audio_transcript.completed':
-                    setTranslation(msg.transcript || '');
+                    if (msg.transcript) {
+                        setTranslation(msg.transcript);
+                    }
                     break;
 
                 case 'response.audio.delta':
