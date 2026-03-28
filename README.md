@@ -1,6 +1,6 @@
-# Talki 🗣️
+# Talkii 🗣️
 
-Talki is a high-performance AI personal language assistant specifically designed for immigrants. It goes beyond simple translation to provide a comprehensive communication toolkit, helping users navigate new environments with confidence.
+Talkii is a high-performance AI personal language assistant specifically designed for immigrants. It goes beyond simple translation to provide a comprehensive communication toolkit, helping users navigate new environments with confidence.
 
 ## Visual Preview
 
@@ -29,7 +29,7 @@ Talki is a high-performance AI personal language assistant specifically designed
 1. Clone the repository:
    ```bash
    git clone <repository-url>
-   cd Talki
+   cd Talkii
    ```
 
 2. Install dependencies:
@@ -70,7 +70,7 @@ To ensure maximum security and protect project credentials, all AI processing (S
 
 ## Project Setup
 
-Talki uses **Supabase** for its backend infrastructure. To get started:
+Talkii uses **Supabase** for its backend infrastructure. To get started:
 
 1. Create a new project at [Supabase](https://supabase.com/).
 2. Obtain your `Project URL` and `Anon Key` from the API settings.
@@ -93,3 +93,4 @@ To learn more about the tools used in this project:
 
 ---
 Created by [Agyei Michael Addai (Michantech)](https://www.linkedin.com/in/michael-addai-agyei)
+# Talkii

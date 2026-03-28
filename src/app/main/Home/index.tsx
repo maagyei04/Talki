@@ -1,6 +1,11 @@
 import { Box, Text } from '@/src/services/config';
 import { supabase } from '@/src/services/supabase';
+import { transcribe, synthesize, translate, isSupportedSTT, isSupportedTTS, isSupportedTranslation } from '@/src/services/ai/ghanaNLP';
 import { useRealtimeTranslation } from '@/src/shared/hooks/useRealtimeTranslation';
+
+
+
+
 import { useVoiceRecorder } from '@/src/shared/hooks/useVoiceRecorder';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -30,16 +35,21 @@ type Message = {
 };
 
 const LANGUAGE_MAP: Record<string, string> = {
+  ak: 'Akan (Twi)',
   ar: 'Arabic',
   bn: 'Bengali',
   zh: 'Chinese',
   da: 'Danish',
   nl: 'Dutch',
   en: 'English',
+  ee: 'Ewe',
+  fat: 'Fante',
   fi: 'Finnish',
   fr: 'French',
+  gaa: 'Ga',
   de: 'German',
   el: 'Greek',
+  ha: 'Hausa',
   he: 'Hebrew',
   hi: 'Hindi',
   id: 'Indonesian',
@@ -65,16 +75,26 @@ const LANGUAGE_MAP: Record<string, string> = {
 };
 
 const LANG_ABBREVIATIONS: Record<string, string> = {
+  'Akan (Twi)': 'AK',
   Arabic: 'AR',
-  Finnish: 'FI',
   English: 'EN',
+  Ewe: 'EE',
+  Fante: 'FA',
+  Finnish: 'FI',
+  Ga: 'GA',
+  Hausa: 'HA',
 };
+
+type LanguageName = string;
+
+
 
 export default function HomeScreen() {
   // --- State & Hooks ---
   const [translationMode, setTranslationMode] = useState<'standard' | 'live'>('live');
-  const [langA, setLangA] = useState<'Arabic' | 'Finnish' | 'English'>('English');
-  const [langB, setLangB] = useState<'Arabic' | 'Finnish' | 'English'>('Arabic');
+  const [langA, setLangA] = useState<LanguageName>('English');
+  const [langB, setLangB] = useState<LanguageName>('Akan (Twi)');
+
   const [isProcessing, setIsProcessing] = useState(false);
   const [transcription, setTranscription] = useState<Message[]>([]);
   const [detectedLang, setDetectedLang] = useState('Auto-detect');
@@ -102,7 +122,17 @@ export default function HomeScreen() {
   const player = useAudioPlayer();
   const bottomSheetModalRef = useRef<BottomSheetModal>(null);
   const snapPoints = useMemo(() => ['50%'], []);
-  const languages: Array<'Arabic' | 'Finnish' | 'English'> = ['Finnish', 'Arabic', 'English'];
+  const languages: LanguageName[] = [
+    'English',
+    'Akan (Twi)',
+    'Ga',
+    'Ewe',
+    'Hausa',
+    'Fante',
+    'Arabic',
+    'Finnish'
+  ];
+
 
   // --- Animations ---
   const pulseScale = useSharedValue(1);
@@ -163,11 +193,12 @@ export default function HomeScreen() {
     }
   }, [isConnectedLive, translationMode, disconnectLive]);
 
-  const handleLanguageSelect = useCallback((lang: 'Arabic' | 'Finnish' | 'English') => {
+  const handleLanguageSelect = useCallback((lang: LanguageName) => {
     if (pickingLangType === 'A') setLangA(lang);
     else setLangB(lang);
     bottomSheetModalRef.current?.dismiss();
   }, [pickingLangType]);
+
 
   const renderBackdrop = useCallback(
     (props: any) => (
@@ -183,6 +214,12 @@ export default function HomeScreen() {
 
   const playTranslation = async (path: string) => {
     try {
+      if (path.startsWith('file://')) {
+        player.replace(path);
+        player.play();
+        return;
+      }
+
       const { data, error } = await supabase.storage
         .from('recordings')
         .createSignedUrl(path, 3600);
@@ -198,7 +235,10 @@ export default function HomeScreen() {
     }
   };
 
+
   // --- Standard Mode Processing ---
+  const GHANAIAN_LANGUAGES = ['Akan (Twi)', 'Ga', 'Ewe', 'Hausa', 'Fante'];
+
   useEffect(() => {
     const processAudio = async () => {
       if (recordingUri && translationMode === 'standard') {
@@ -207,46 +247,168 @@ export default function HomeScreen() {
           const { data: { user } } = await supabase.auth.getUser();
           if (!user) throw new Error('Not authenticated');
 
-          const fileName = `${Date.now()}.m4a`;
-          const filePath = `${user.id}/${fileName}`;
-          const formData = new FormData();
-          formData.append('file', {
-            uri: recordingUri,
-            name: fileName,
-            type: 'audio/m4a',
-          } as any);
+          let originalText = '';
+          let translatedText = '';
+          let ttsPath = '';
 
-          const { error: uploadError } = await supabase.storage
-            .from('recordings')
-            .upload(filePath, formData);
+          const isGhanaianLang = GHANAIAN_LANGUAGES.includes(langB) || GHANAIAN_LANGUAGES.includes(langA);
 
-          if (uploadError) throw uploadError;
+          if (isGhanaianLang) {
+            console.log('[GhanaNLP] Path detected for Ghanaian language');
+            
+            // 1. Transcription
+            if (isSupportedSTT(langA)) {
+               originalText = await transcribe(recordingUri, langA);
+            } else {
 
-          const { data: edgeData, error: edgeError } = await supabase.functions.invoke('process-audio', {
-            body: { recordPath: filePath, targetLang: langB }
-          });
 
-          if (edgeError) throw edgeError;
+               // Fallback to OpenAI via Edge Function or existing logic
+               // For now, let's keep it simple and just use the Edge Function for STT if langA is not Ghanaian
+            }
 
-          if (edgeData.message) {
+            // 2. Translation & TTS
+            // If we have originalText from GhanaNLP or if it's an English -> Ghanaian pair
+            if (!originalText && !GHANAIAN_LANGUAGES.includes(langA)) {
+                // Case: English -> Ghanaian
+                // 1. Transcription (English)
+                const fileName = `${Date.now()}.m4a`;
+                const filePath = `${user.id}/${fileName}`;
+                const formData = new FormData();
+                formData.append('file', {
+                    uri: recordingUri,
+                    name: fileName,
+                    type: 'audio/m4a',
+                } as any);
+
+                await supabase.storage.from('recordings').upload(filePath, formData);
+
+                // Use GhanaNLP for translation if supported to reduce latency
+                if (isSupportedTranslation(langA, langB)) {
+                  console.log('[GhanaNLP] Using direct translation for optimization');
+                  // We still need Whisper for English STT for now, so we use the Edge Function
+                  // But we only ask it for transcription, of if it's fast enough we just use it.
+                  // Actually, let's use the Edge Function for the full flow if it's already implemented,
+                  // BUT override the TTS as we did before.
+                  
+                  const { data: edgeData, error: edgeError } = await supabase.functions.invoke('process-audio', {
+                      body: { recordPath: filePath, targetLang: langB }
+                  });
+
+                  if (edgeError) throw edgeError;
+                  originalText = edgeData.message.original_text;
+                  translatedText = edgeData.message.translated_text;
+                  ttsPath = edgeData.audioUrl;
+                } else {
+                  const { data: edgeData, error: edgeError } = await supabase.functions.invoke('process-audio', {
+                      body: { recordPath: filePath, targetLang: langB }
+                  });
+
+                  if (edgeError) throw edgeError;
+                  originalText = edgeData.message.original_text;
+                  translatedText = edgeData.message.translated_text;
+                  ttsPath = edgeData.audioUrl;
+                }
+
+                // SPECIAL: If target is Ghanaian and supported, replace TTS with GhanaNLP
+                if (isSupportedTTS(langB)) {
+                  console.log('[GhanaNLP] Overriding TTS with GhanaNLP');
+                  const localTtsUri = await synthesize(translatedText, langB);
+                  ttsPath = localTtsUri;
+                }
+            } else if (originalText) {
+                // Case: Ghanaian -> English/Other (We have originalText from STT)
+                console.log('[GhanaNLP] Ghanaian STT successful, translating...');
+                
+                if (isSupportedTranslation(langA, langB)) {
+                   translatedText = await translate(originalText, langA, langB);
+                   console.log('[GhanaNLP] Direct translation successful:', translatedText);
+                } else {
+                   // Fallback to GPT via Edge Function (needs recordPath)
+                   // Since we need to store it anyway, we'll upload
+                   const fileName = `${Date.now()}.m4a`;
+                   const filePath = `${user.id}/${fileName}`;
+                   const formData = new FormData();
+                   formData.append('file', {
+                       uri: recordingUri,
+                       name: fileName,
+                       type: 'audio/m4a',
+                   } as any);
+                   await supabase.storage.from('recordings').upload(filePath, formData);
+                   
+                   const { data: edgeData, error: edgeError } = await supabase.functions.invoke('process-audio', {
+                       body: { recordPath: filePath, targetLang: langB }
+                   });
+                   if (edgeError) throw edgeError;
+                   translatedText = edgeData.message.translated_text;
+                   ttsPath = edgeData.audioUrl;
+                }
+            }
+          }
+
+
+          // IF NOT HANDLED BY GHANANLP SPECIAL FLOW, USE DEFAULT
+          if (!translatedText) {
+            const fileName = `${Date.now()}.m4a`;
+            const filePath = `${user.id}/${fileName}`;
+            const formData = new FormData();
+            formData.append('file', {
+                uri: recordingUri,
+                name: fileName,
+                type: 'audio/m4a',
+            } as any);
+
+            const { error: uploadError } = await supabase.storage
+                .from('recordings')
+                .upload(filePath, formData);
+
+            if (uploadError) throw uploadError;
+
+            const { data: edgeData, error: edgeError } = await supabase.functions.invoke('process-audio', {
+                body: { recordPath: filePath, targetLang: langB }
+            });
+
+            if (edgeError) throw edgeError;
+            
+            originalText = edgeData.message.original_text;
+            translatedText = edgeData.message.translated_text;
+            ttsPath = edgeData.audioUrl;
+
+            // Optional: Override TTS for Ghanaian target if supported
+            if (isSupportedTTS(langB)) {
+                try {
+                  const localTtsUri = await synthesize(translatedText, langB);
+                  ttsPath = localTtsUri;
+                } catch (e) {
+                  console.error('GhanaNLP TTS fallback failure:', e);
+                }
+            }
+
+
+          }
+
+          if (originalText) {
             const newMessage: Message = {
-              id: `${edgeData.message.id}-trans`,
-              text: edgeData.message.translated_text,
+              id: `${Date.now()}-trans`,
+              text: translatedText,
               speaker: 'other',
-              timestamp: new Date(edgeData.message.created_at),
-              audioPath: edgeData.audioUrl
+              timestamp: new Date(),
+              audioPath: ttsPath
             };
 
             setTranscription(prev => [...prev, {
-              id: edgeData.message.id,
-              text: edgeData.message.original_text,
+              id: `${Date.now()}-orig`,
+              text: originalText,
               speaker: 'me',
-              timestamp: new Date(edgeData.message.created_at)
+              timestamp: new Date()
             }, newMessage]);
 
-            if (edgeData.audioUrl) playTranslation(edgeData.audioUrl);
+            if (ttsPath) {
+              console.log(`[HomeScreen] Final ttsPath: ${ttsPath}`);
+              playTranslation(ttsPath);
+            }
           }
         } catch (error: any) {
+
           console.error('Processing failed:', error);
           Alert.alert('Error', error.message || 'Failed to process audio');
         } finally {
@@ -256,6 +418,7 @@ export default function HomeScreen() {
     };
     processAudio();
   }, [recordingUri, translationMode]);
+
 
   // --- User Actions ---
   const toggleRecording = async () => {
@@ -511,7 +674,7 @@ export default function HomeScreen() {
               >
                 <ActivityIndicator size="small" color="#420080ff" />
                 <Text variant="body" color="textSecondary" marginLeft="small" style={{ fontStyle: 'italic' }}>
-                  Talki is processing...
+                  Talkii is processing...
                 </Text>
               </Box>
             </Box>
@@ -561,7 +724,7 @@ export default function HomeScreen() {
               Select Target Language
             </Text>
           )}
-          renderItem={({ item }: { item: 'Arabic' | 'Finnish' | 'English' }) => {
+          renderItem={({ item }: { item: LanguageName }) => {
             const currentSelected = pickingLangType === 'A' ? langA : langB;
             return (
               <Pressable onPress={() => handleLanguageSelect(item)}>
@@ -589,6 +752,7 @@ export default function HomeScreen() {
               </Pressable>
             );
           }}
+
           contentContainerStyle={{ padding: 20, paddingBottom: 40 }}
         />
       </BottomSheetModal>

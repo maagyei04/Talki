@@ -14,7 +14,7 @@ export default function SupportScreen() {
     };
 
     const sendEmail = () => {
-        Linking.openURL('mailto:support@talki.ai?subject=Support Request&body=Hi Talki Team,');
+        Linking.openURL('mailto:support@Talkii.ai?subject=Support Request&body=Hi Talkii Team,');
     };
 
     const SupportItem = ({ icon, label, onPress, isLast = false, color = '#420080ff' }: any) => (
@@ -61,7 +61,7 @@ export default function SupportScreen() {
                         <SupportItem
                             icon="book-outline"
                             label="Help Center"
-                            onPress={() => openLink('https://talki.ai/help')}
+                            onPress={() => openLink('https://Talkii.ai/help')}
                         />
                         <SupportItem
                             icon="mail-outline"
@@ -71,12 +71,12 @@ export default function SupportScreen() {
                         <SupportItem
                             icon="chatbubble-outline"
                             label="Community Discord"
-                            onPress={() => openLink('https://discord.gg/talki')}
+                            onPress={() => openLink('https://discord.gg/Talkii')}
                         />
                         <SupportItem
                             icon="bug-outline"
                             label="Report a Bug"
-                            onPress={() => openLink('https://talki.ai/feedback')}
+                            onPress={() => openLink('https://Talkii.ai/feedback')}
                             isLast
                         />
                     </Box>
@@ -88,19 +88,19 @@ export default function SupportScreen() {
                         <SupportItem
                             icon="document-text-outline"
                             label="Terms of Service"
-                            onPress={() => openLink('https://talki.ai/terms')}
+                            onPress={() => openLink('https://Talkii.ai/terms')}
                         />
                         <SupportItem
                             icon="shield-outline"
                             label="Privacy Policy"
-                            onPress={() => openLink('https://talki.ai/privacy')}
+                            onPress={() => openLink('https://Talkii.ai/privacy')}
                             isLast
                         />
                     </Box>
                 </Box>
 
                 <Box marginTop="xl" alignItems="center">
-                    <Text variant="captionSmall" color="textDisabled">Talki AI for iOS & Android</Text>
+                    <Text variant="captionSmall" color="textDisabled">Talkii AI for iOS & Android</Text>
                     <Text variant="captionSmall" color="textDisabled">Version 1.0.0 (Build 20260210)</Text>
                 </Box>
             </ScrollView>

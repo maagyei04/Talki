@@ -175,7 +175,7 @@ export default function PrivacyScreen() {
 
                 <Box marginTop="xxxl" padding="medium" backgroundColor="backgroundSecondary" borderRadius="md">
                     <Text variant="captionSmall" color="textSecondary" textAlign="center">
-                        At Talki, we take your privacy seriously. All audio is processed securely and deleted from our active servers after transcription unless shared for AI improvement.
+                        At Talkii, we take your privacy seriously. All audio is processed securely and deleted from our active servers after transcription unless shared for AI improvement.
                     </Text>
                 </Box>
             </ScrollView>
