@@ -1,12 +1,15 @@
 import { Box, Text } from '@/src/services/config';
 import { supabase } from '@/src/services/supabase';
+import { transcribe, synthesize, translate, isSupportedSTT, isSupportedTTS, isSupportedTranslation } from '@/src/services/ai/ghanaNLP';
 import { useRealtimeTranslation } from '@/src/shared/hooks/useRealtimeTranslation';
+
+
+
+
 import { useVoiceRecorder } from '@/src/shared/hooks/useVoiceRecorder';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useTrialManager } from '@/src/shared/hooks/useTrialManager';
 import Animated, {
   FadeInDown,
   useAnimatedStyle,
@@ -32,16 +35,21 @@ type Message = {
 };
 
 const LANGUAGE_MAP: Record<string, string> = {
+  ak: 'Akan (Twi)',
   ar: 'Arabic',
   bn: 'Bengali',
   zh: 'Chinese',
   da: 'Danish',
   nl: 'Dutch',
   en: 'English',
+  ee: 'Ewe',
+  fat: 'Fante',
   fi: 'Finnish',
   fr: 'French',
+  gaa: 'Ga',
   de: 'German',
   el: 'Greek',
+  ha: 'Hausa',
   he: 'Hebrew',
   hi: 'Hindi',
   id: 'Indonesian',
@@ -66,25 +74,27 @@ const LANGUAGE_MAP: Record<string, string> = {
   vi: 'Vietnamese',
 };
 
-import { useTranslation } from 'react-i18next';
-import { I18nManager } from 'react-native';
-
 const LANG_ABBREVIATIONS: Record<string, string> = {
+  'Akan (Twi)': 'AK',
   Arabic: 'AR',
-  Finnish: 'FI',
   English: 'EN',
-  Swedish: 'SV',
+  Ewe: 'EE',
+  Fante: 'FA',
+  Finnish: 'FI',
+  Ga: 'GA',
+  Hausa: 'HA',
 };
 
-export default function HomeScreen() {
-  const router = useRouter();
-  const { t } = useTranslation();
-  const { canStartSession, recordSession, presentPaywall, isPremium, sessionsUsed } = useTrialManager();
+type LanguageName = string;
 
+
+
+export default function HomeScreen() {
   // --- State & Hooks ---
   const [translationMode, setTranslationMode] = useState<'standard' | 'live'>('live');
-  const [langA, setLangA] = useState<'Arabic' | 'Finnish' | 'English' | 'Swedish'>('English');
-  const [langB, setLangB] = useState<'Arabic' | 'Finnish' | 'English' | 'Swedish'>('Arabic');
+  const [langA, setLangA] = useState<LanguageName>('English');
+  const [langB, setLangB] = useState<LanguageName>('Akan (Twi)');
+
   const [isProcessing, setIsProcessing] = useState(false);
   const [transcription, setTranscription] = useState<Message[]>([]);
   const [detectedLang, setDetectedLang] = useState('Auto-detect');
@@ -95,8 +105,7 @@ export default function HomeScreen() {
     isRecording: isRecordingStandard,
     startRecording: startRecordingStandard,
     stopRecording: stopRecordingStandard,
-    recordingUri,
-    clearRecording: clearRecordingStandard
+    recordingUri
   } = useVoiceRecorder();
 
   // Live Mode Hook
@@ -113,10 +122,17 @@ export default function HomeScreen() {
   const player = useAudioPlayer();
   const bottomSheetModalRef = useRef<BottomSheetModal>(null);
   const snapPoints = useMemo(() => ['50%'], []);
-  const languages: Array<'Arabic' | 'Finnish' | 'English' | 'Swedish'> = ['Finnish', 'Arabic', 'English', 'Swedish'];
+  const languages: LanguageName[] = [
+    'English',
+    'Akan (Twi)',
+    'Ga',
+    'Ewe',
+    'Hausa',
+    'Fante',
+    'Arabic',
+    'Finnish'
+  ];
 
-  // Session Tracking for Trials
-  const sessionStartTimeRef = useRef<number | null>(null);
 
   // --- Animations ---
   const pulseScale = useSharedValue(1);
@@ -158,12 +174,12 @@ export default function HomeScreen() {
     setPickingLangType(type);
     if (isConnectedLive && translationMode === 'live') {
       Alert.alert(
-        t('home.changeLangTitle'),
-        t('home.changeLangDesc'),
+        'Change Language?',
+        'Changing the language will restart your live session. Continue?',
         [
-          { text: t('common.cancel'), style: 'cancel' },
+          { text: 'Cancel', style: 'cancel' },
           {
-            text: t('home.change'),
+            text: 'Change',
             style: 'destructive',
             onPress: async () => {
               await disconnectLive();
@@ -175,13 +191,14 @@ export default function HomeScreen() {
     } else {
       bottomSheetModalRef.current?.present();
     }
-  }, [isConnectedLive, translationMode, disconnectLive, t]);
+  }, [isConnectedLive, translationMode, disconnectLive]);
 
-  const handleLanguageSelect = useCallback((lang: 'Arabic' | 'Finnish' | 'English' | 'Swedish') => {
+  const handleLanguageSelect = useCallback((lang: LanguageName) => {
     if (pickingLangType === 'A') setLangA(lang);
     else setLangB(lang);
     bottomSheetModalRef.current?.dismiss();
   }, [pickingLangType]);
+
 
   const renderBackdrop = useCallback(
     (props: any) => (
@@ -197,6 +214,12 @@ export default function HomeScreen() {
 
   const playTranslation = async (path: string) => {
     try {
+      if (path.startsWith('file://')) {
+        player.replace(path);
+        player.play();
+        return;
+      }
+
       const { data, error } = await supabase.storage
         .from('recordings')
         .createSignedUrl(path, 3600);
@@ -212,7 +235,10 @@ export default function HomeScreen() {
     }
   };
 
+
   // --- Standard Mode Processing ---
+  const GHANAIAN_LANGUAGES = ['Akan (Twi)', 'Ga', 'Ewe', 'Hausa', 'Fante'];
+
   useEffect(() => {
     const processAudio = async () => {
       if (recordingUri && translationMode === 'standard') {
@@ -221,52 +247,168 @@ export default function HomeScreen() {
           const { data: { user } } = await supabase.auth.getUser();
           if (!user) throw new Error('Not authenticated');
 
-          const fileName = `${Date.now()}.m4a`;
-          const filePath = `${user.id}/${fileName}`;
-          const formData = new FormData();
-          formData.append('file', {
-            uri: recordingUri,
-            name: fileName,
-            type: 'audio/m4a',
-          } as any);
+          let originalText = '';
+          let translatedText = '';
+          let ttsPath = '';
 
-          const { error: uploadError } = await supabase.storage
-            .from('recordings')
-            .upload(filePath, formData);
+          const isGhanaianLang = GHANAIAN_LANGUAGES.includes(langB) || GHANAIAN_LANGUAGES.includes(langA);
 
-          if (uploadError) throw uploadError;
+          if (isGhanaianLang) {
+            console.log('[GhanaNLP] Path detected for Ghanaian language');
+            
+            // 1. Transcription
+            if (isSupportedSTT(langA)) {
+               originalText = await transcribe(recordingUri, langA);
+            } else {
 
-          const { data: edgeData, error: edgeError } = await supabase.functions.invoke('process-audio', {
-            body: { recordPath: filePath, targetLang: langB }
-          });
 
-          if (edgeError) throw edgeError;
+               // Fallback to OpenAI via Edge Function or existing logic
+               // For now, let's keep it simple and just use the Edge Function for STT if langA is not Ghanaian
+            }
 
-          if (edgeData.message) {
-            // Record trial usage for standard mode translation
-            await recordSession();
+            // 2. Translation & TTS
+            // If we have originalText from GhanaNLP or if it's an English -> Ghanaian pair
+            if (!originalText && !GHANAIAN_LANGUAGES.includes(langA)) {
+                // Case: English -> Ghanaian
+                // 1. Transcription (English)
+                const fileName = `${Date.now()}.m4a`;
+                const filePath = `${user.id}/${fileName}`;
+                const formData = new FormData();
+                formData.append('file', {
+                    uri: recordingUri,
+                    name: fileName,
+                    type: 'audio/m4a',
+                } as any);
 
+                await supabase.storage.from('recordings').upload(filePath, formData);
+
+                // Use GhanaNLP for translation if supported to reduce latency
+                if (isSupportedTranslation(langA, langB)) {
+                  console.log('[GhanaNLP] Using direct translation for optimization');
+                  // We still need Whisper for English STT for now, so we use the Edge Function
+                  // But we only ask it for transcription, of if it's fast enough we just use it.
+                  // Actually, let's use the Edge Function for the full flow if it's already implemented,
+                  // BUT override the TTS as we did before.
+                  
+                  const { data: edgeData, error: edgeError } = await supabase.functions.invoke('process-audio', {
+                      body: { recordPath: filePath, targetLang: langB }
+                  });
+
+                  if (edgeError) throw edgeError;
+                  originalText = edgeData.message.original_text;
+                  translatedText = edgeData.message.translated_text;
+                  ttsPath = edgeData.audioUrl;
+                } else {
+                  const { data: edgeData, error: edgeError } = await supabase.functions.invoke('process-audio', {
+                      body: { recordPath: filePath, targetLang: langB }
+                  });
+
+                  if (edgeError) throw edgeError;
+                  originalText = edgeData.message.original_text;
+                  translatedText = edgeData.message.translated_text;
+                  ttsPath = edgeData.audioUrl;
+                }
+
+                // SPECIAL: If target is Ghanaian and supported, replace TTS with GhanaNLP
+                if (isSupportedTTS(langB)) {
+                  console.log('[GhanaNLP] Overriding TTS with GhanaNLP');
+                  const localTtsUri = await synthesize(translatedText, langB);
+                  ttsPath = localTtsUri;
+                }
+            } else if (originalText) {
+                // Case: Ghanaian -> English/Other (We have originalText from STT)
+                console.log('[GhanaNLP] Ghanaian STT successful, translating...');
+                
+                if (isSupportedTranslation(langA, langB)) {
+                   translatedText = await translate(originalText, langA, langB);
+                   console.log('[GhanaNLP] Direct translation successful:', translatedText);
+                } else {
+                   // Fallback to GPT via Edge Function (needs recordPath)
+                   // Since we need to store it anyway, we'll upload
+                   const fileName = `${Date.now()}.m4a`;
+                   const filePath = `${user.id}/${fileName}`;
+                   const formData = new FormData();
+                   formData.append('file', {
+                       uri: recordingUri,
+                       name: fileName,
+                       type: 'audio/m4a',
+                   } as any);
+                   await supabase.storage.from('recordings').upload(filePath, formData);
+                   
+                   const { data: edgeData, error: edgeError } = await supabase.functions.invoke('process-audio', {
+                       body: { recordPath: filePath, targetLang: langB }
+                   });
+                   if (edgeError) throw edgeError;
+                   translatedText = edgeData.message.translated_text;
+                   ttsPath = edgeData.audioUrl;
+                }
+            }
+          }
+
+
+          // IF NOT HANDLED BY GHANANLP SPECIAL FLOW, USE DEFAULT
+          if (!translatedText) {
+            const fileName = `${Date.now()}.m4a`;
+            const filePath = `${user.id}/${fileName}`;
+            const formData = new FormData();
+            formData.append('file', {
+                uri: recordingUri,
+                name: fileName,
+                type: 'audio/m4a',
+            } as any);
+
+            const { error: uploadError } = await supabase.storage
+                .from('recordings')
+                .upload(filePath, formData);
+
+            if (uploadError) throw uploadError;
+
+            const { data: edgeData, error: edgeError } = await supabase.functions.invoke('process-audio', {
+                body: { recordPath: filePath, targetLang: langB }
+            });
+
+            if (edgeError) throw edgeError;
+            
+            originalText = edgeData.message.original_text;
+            translatedText = edgeData.message.translated_text;
+            ttsPath = edgeData.audioUrl;
+
+            // Optional: Override TTS for Ghanaian target if supported
+            if (isSupportedTTS(langB)) {
+                try {
+                  const localTtsUri = await synthesize(translatedText, langB);
+                  ttsPath = localTtsUri;
+                } catch (e) {
+                  console.error('GhanaNLP TTS fallback failure:', e);
+                }
+            }
+
+
+          }
+
+          if (originalText) {
             const newMessage: Message = {
-              id: `${edgeData.message.id}-trans`,
-              text: edgeData.message.translated_text,
+              id: `${Date.now()}-trans`,
+              text: translatedText,
               speaker: 'other',
-              timestamp: new Date(edgeData.message.created_at),
-              audioPath: edgeData.audioUrl
+              timestamp: new Date(),
+              audioPath: ttsPath
             };
 
             setTranscription(prev => [...prev, {
-              id: edgeData.message.id,
-              text: edgeData.message.original_text,
+              id: `${Date.now()}-orig`,
+              text: originalText,
               speaker: 'me',
-              timestamp: new Date(edgeData.message.created_at)
+              timestamp: new Date()
             }, newMessage]);
 
-            if (edgeData.audioUrl) playTranslation(edgeData.audioUrl);
-            
-            // ⚠️ FIX: Clear the recording URI from hook state so it doesn't re-process on tab switch/mount
-            clearRecordingStandard();
+            if (ttsPath) {
+              console.log(`[HomeScreen] Final ttsPath: ${ttsPath}`);
+              playTranslation(ttsPath);
+            }
           }
         } catch (error: any) {
+
           console.error('Processing failed:', error);
           Alert.alert('Error', error.message || 'Failed to process audio');
         } finally {
@@ -275,37 +417,20 @@ export default function HomeScreen() {
       }
     };
     processAudio();
-  }, [recordingUri, translationMode, recordSession]);
+  }, [recordingUri, translationMode]);
+
 
   // --- User Actions ---
   const toggleRecording = async () => {
-    // Gatekeeper Check
-    if (!canStartSession) {
-      await presentPaywall();
-      return;
-    }
-
     if (translationMode === 'live') {
       if (isConnectedLive) {
-        // Ending a live session
-        const duration = sessionStartTimeRef.current ? (Date.now() - sessionStartTimeRef.current) / 1000 : 0;
         await disconnectLive();
-        sessionStartTimeRef.current = null;
-
-        // If session was > 5 seconds, record it as a trial session
-        if (duration >= 5) {
-          await recordSession();
-        }
       } else {
-        // Starting a live session
-        sessionStartTimeRef.current = Date.now();
         await connectLive();
       }
     } else {
       if (isRecordingStandard) {
         await stopRecordingStandard();
-        // For standard mode, we might want to record after a certain number of translations
-        // but the prompt specifically mentioned 5-minute sessions.
       } else {
         await startRecordingStandard();
       }
@@ -324,7 +449,7 @@ export default function HomeScreen() {
     <Box flex={1} backgroundColor="background">
       {/* Header: Controls & Languages */}
       <Box
-        flexDirection={I18nManager.isRTL ? "row-reverse" : "row"}
+        flexDirection="row"
         alignItems="center"
         justifyContent="space-between"
         paddingHorizontal="medium"
@@ -363,7 +488,7 @@ export default function HomeScreen() {
                 translationMode === 'standard' && styles.activeSegmentText
               ]}
             >
-              {t('home.chat')}
+              CHAT
             </Text>
           </Pressable>
 
@@ -388,7 +513,7 @@ export default function HomeScreen() {
                 translationMode === 'live' && styles.activeSegmentText
               ]}
             >
-              {t('home.live')}
+              LIVE
             </Text>
           </Pressable>
         </Box>
@@ -396,7 +521,7 @@ export default function HomeScreen() {
         {/* Dynamic Header Picker */}
         {translationMode === 'live' ? (
           /* Dual Language Header (LIVE) */
-          <Box flexDirection={I18nManager.isRTL ? "row-reverse" : "row"} alignItems="center">
+          <Box flexDirection="row" alignItems="center">
             <Pressable
               onPress={() => handlePresentModalPress('A')}
               style={[styles.langDisplay, { backgroundColor: '#420080ff', minWidth: 60 }]}
@@ -432,7 +557,7 @@ export default function HomeScreen() {
             style={[styles.langDisplay, { backgroundColor: '#420080ff' }]}
           >
             <Box flexDirection="row" alignItems="center">
-              <Text variant="subheading" color="white">{t(`common.${langB.toLowerCase()}`, langB)}</Text>
+              <Text variant="subheading" color="white">{langB}</Text>
               <Ionicons name="chevron-down" size={14} color="rgba(255,255,255,0.7)" style={{ marginLeft: 4 }} />
             </Box>
           </Pressable>
@@ -445,42 +570,38 @@ export default function HomeScreen() {
         <ScrollView contentContainerStyle={styles.liveContent} showsVerticalScrollIndicator={false}>
 
           {/* Status + Speech Indicator */}
-          <Box flexDirection={I18nManager.isRTL ? "row-reverse" : "row"} alignItems="center" justifyContent="space-between" marginBottom="xl">
-            <Box flexDirection={I18nManager.isRTL ? "row-reverse" : "row"} alignItems="center">
+          <Box flexDirection="row" alignItems="center" justifyContent="space-between" marginBottom="xl">
+            <Box flexDirection="row" alignItems="center">
               <Animated.View style={[styles.liveDot, isConnectedLive && liveIndicatorStyle, !isConnectedLive && { backgroundColor: '#666' }]} />
               <Text variant="caption" color={isConnectedLive ? "error" : "textSecondary"} fontWeight="bold" marginLeft="nano">
-                {isConnectedLive ? t('home.streaming') : t('home.offline')}
+                {isConnectedLive ? "STREAMING" : "OFFLINE"}
               </Text>
             </Box>
             {/* Speech Detection Indicator */}
             {isConnectedLive && isSpeakingLive && (
-              <Animated.View entering={FadeInDown} style={{ flexDirection: I18nManager.isRTL ? 'row-reverse' : 'row', alignItems: 'center' }}>
-                <Animated.View style={[{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#4CAF50', marginRight: I18nManager.isRTL ? 0 : 6, marginLeft: I18nManager.isRTL ? 6 : 0 }, pulseStyle]} />
-                <Text variant="caption" fontWeight="bold" style={{ color: '#4CAF50' }}>{t('home.speaking')}</Text>
+              <Animated.View entering={FadeInDown} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Animated.View style={[{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#4CAF50', marginRight: 6 }, pulseStyle]} />
+                <Text variant="caption" fontWeight="bold" style={{ color: '#4CAF50' }}>SPEAKING</Text>
               </Animated.View>
             )}
           </Box>
 
           {/* Original Audio (Faded) */}
           <Box marginBottom="xl" minHeight={80} opacity={0.6}>
-            <Text variant="caption" color="textSecondary" marginBottom="small" textAlign={I18nManager.isRTL ? 'right' : 'left'}>
-              {t('home.originalAudio')}
-            </Text>
-            <Text variant="body" color="black" style={[styles.liveTranscriptText, { textAlign: I18nManager.isRTL ? 'right' : 'left' }]}>
-              {transcriptLive || (isConnectedLive ? (isRecordingLive ? t('home.listening') : t('home.connecting')) : t('home.readyLive'))}
+            <Text variant="caption" color="textSecondary" marginBottom="small">ORIGINAL AUDIO</Text>
+            <Text variant="body" color="black" style={styles.liveTranscriptText}>
+              {transcriptLive || (isConnectedLive ? (isRecordingLive ? "Listening..." : "Connecting...") : "Ready for simultaneous flow")}
             </Text>
           </Box>
 
           {/* Translation Output */}
           <Animated.View entering={FadeInDown.delay(200)} style={styles.liveTranslationContainer}>
-            <Box flexDirection={I18nManager.isRTL ? "row-reverse" : "row"} alignItems="center" marginBottom="medium">
+            <Box flexDirection="row" alignItems="center" marginBottom="medium">
               <MaterialCommunityIcons name="broadcast" size={20} color="#420080ff" />
-              <Text variant="subheading" color="info" marginLeft={I18nManager.isRTL ? "none" : "small"} marginRight={I18nManager.isRTL ? "small" : "none"} fontWeight="bold">
-                {t('home.voiceover')}
-              </Text>
+              <Text variant="subheading" color="info" marginLeft="small" fontWeight="bold">VOICEOVER</Text>
             </Box>
-            <Text variant="heading2" color="black" style={[styles.liveTranslationText, { textAlign: I18nManager.isRTL ? 'right' : 'left' }]}>
-              {translationLive || (isConnectedLive ? t('home.translating') : t('home.startLive'))}
+            <Text variant="heading2" color="black" style={styles.liveTranslationText}>
+              {translationLive || (isConnectedLive ? "Translating live..." : "Start session to begin")}
             </Text>
           </Animated.View>
         </ScrollView>
@@ -495,7 +616,7 @@ export default function HomeScreen() {
             <Box flex={1} justifyContent="center" alignItems="center" opacity={0.5}>
               <MaterialCommunityIcons name="microphone-outline" size={64} color="black" />
               <Text variant="body" marginTop="medium" textAlign="center" color="textSecondary">
-                {t('home.emptyHome')}
+                Tap the button below and speak{'\n'}to start your conversation
               </Text>
             </Box>
           ) : (
@@ -514,16 +635,16 @@ export default function HomeScreen() {
                     backgroundColor={msg.speaker === 'me' ? 'black' : 'backgroundSecondary'}
                     padding="medium"
                     borderRadius="md"
-                    flexDirection={I18nManager.isRTL ? "row-reverse" : "row"}
+                    flexDirection="row"
                     alignItems="center"
                   >
                     <Box flexShrink={1}>
-                      <Text variant="body" color={msg.speaker === 'me' ? 'white' : 'text'} textAlign={I18nManager.isRTL ? 'right' : 'left'}>
+                      <Text variant="body" color={msg.speaker === 'me' ? 'white' : 'text'}>
                         {msg.text}
                       </Text>
                     </Box>
                     {msg.audioPath && (
-                      <Box marginLeft={I18nManager.isRTL ? "none" : "small"} marginRight={I18nManager.isRTL ? "small" : "none"}>
+                      <Box marginLeft="small">
                         <Ionicons
                           name="volume-medium"
                           size={20}
@@ -538,7 +659,7 @@ export default function HomeScreen() {
           )}
           {isRecordingStandard && (
             <Box padding="small" alignSelf="center">
-              <Text variant="caption" color="info" fontWeight="bold">{t('home.listening').toUpperCase()}</Text>
+              <Text variant="caption" color="info" fontWeight="bold">LISTENING...</Text>
             </Box>
           )}
           {isProcessing && (
@@ -547,13 +668,13 @@ export default function HomeScreen() {
                 backgroundColor="backgroundSecondary"
                 padding="medium"
                 borderRadius="md"
-                flexDirection={I18nManager.isRTL ? "row-reverse" : "row"}
+                flexDirection="row"
                 alignItems="center"
                 style={{ borderStyle: 'dashed', borderWidth: 1, borderColor: '#42008033' }}
               >
                 <ActivityIndicator size="small" color="#420080ff" />
-                <Text variant="body" color="textSecondary" marginLeft={I18nManager.isRTL ? "none" : "small"} marginRight={I18nManager.isRTL ? "small" : "none"} style={{ fontStyle: 'italic' }}>
-                  {t('home.processing')}
+                <Text variant="body" color="textSecondary" marginLeft="small" style={{ fontStyle: 'italic' }}>
+                  Talkii is processing...
                 </Text>
               </Box>
             </Box>
@@ -579,10 +700,10 @@ export default function HomeScreen() {
             />
           </Animated.View>
         </Pressable>
-        <Text variant="caption" color={translationMode === 'live' ? "textSecondary" : "textSecondary"} marginTop="small" textAlign="center">
+        <Text variant="caption" color={translationMode === 'live' ? "textSecondary" : "textSecondary"} marginTop="small">
           {translationMode === 'live'
-            ? (isConnectedLive ? t('home.tapToStopSession') : t('home.tapToStartLive'))
-            : (isRecordingStandard ? t('home.tapToStop') : t('home.tapToRecord'))}
+            ? (isConnectedLive ? "Tap to stop session" : "Tap to start live flow")
+            : (isRecordingStandard ? "Tap to stop" : "Tap to record message")}
         </Text>
       </Box>
 
@@ -600,15 +721,15 @@ export default function HomeScreen() {
           keyExtractor={(item: string) => item}
           ListHeaderComponent={() => (
             <Text variant="subheading" color="text" marginBottom="medium" textAlign="center">
-              {t('home.selectLang')}
+              Select Target Language
             </Text>
           )}
-          renderItem={({ item }: { item: 'Arabic' | 'Finnish' | 'English' | 'Swedish' }) => {
+          renderItem={({ item }: { item: LanguageName }) => {
             const currentSelected = pickingLangType === 'A' ? langA : langB;
             return (
               <Pressable onPress={() => handleLanguageSelect(item)}>
                 <Box
-                  flexDirection={I18nManager.isRTL ? "row-reverse" : "row"}
+                  flexDirection="row"
                   alignItems="center"
                   justifyContent="space-between"
                   paddingVertical="medium"
@@ -622,7 +743,7 @@ export default function HomeScreen() {
                     color={currentSelected === item ? 'info' : 'text'}
                     fontWeight={currentSelected === item ? 'bold' : 'normal'}
                   >
-                    {t(`common.${item.toLowerCase()}`, item)}
+                    {item}
                   </Text>
                   {currentSelected === item && (
                     <Ionicons name="checkmark-circle" size={20} color="#420080ff" />
@@ -631,6 +752,7 @@ export default function HomeScreen() {
               </Pressable>
             );
           }}
+
           contentContainerStyle={{ padding: 20, paddingBottom: 40 }}
         />
       </BottomSheetModal>

@@ -73,7 +73,7 @@ export default function RegisterScreen() {
                         Create Account
                     </Text>
                     <Text variant="body" color="textSecondary" marginTop="tiny">
-                        Join Talki and start translating your world.
+                        Join Talkii and start translating your world.
                     </Text>
 
                     <View style={styles.form}>

@@ -1,22 +1,22 @@
 {
   "expo": {
-    "name": "Talki",
-    "slug": "Talki",
+    "name": "Talkii",
+    "slug": "Talkii",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./src/assets/images/icons/icon.png",
-    "scheme": "talki",
+    "scheme": "Talkii",
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.samer.talki",
+      "bundleIdentifier": "com.michantech.Talkii",
       "bitcode": "Debug",
+      "jsEngine": "hermes",
       "buildNumber": "1",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "NSCameraUsageDescription": "Talki needs access to your camera to take photos",
-        "NSMicrophoneUsageDescription": "Talki needs access to your microphone to record audio",
-        "LSApplicationQueriesSchemes": ["mailto"]
+        "NSCameraUsageDescription": "Talkii needs access to your camera to take photos",
+        "NSMicrophoneUsageDescription": "Talkii needs access to your microphone to record audio"
       }
     },
     "android": {
@@ -27,7 +27,7 @@
         "monochromeImage": "./src/assets/images/icons/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.samer.talki",
+      "package": "com.michantech.Talkii",
       "versionCode": 1,
       "permissions": [
         "android.permission.READ_EXTERNAL_STORAGE",
@@ -51,7 +51,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./src/assets/images/icons/android-icon-foreground.png",
+          "image": "./src/assets/images/icons/icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",
@@ -64,10 +64,9 @@
       [
         "expo-audio",
         {
-          "microphonePermission": "Talki needs access to your microphone to record audio"
+          "microphonePermission": "Talkii needs access to your microphone to record audio"
         }
-      ],
-      "expo-secure-store"
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
