@@ -18,7 +18,7 @@ import {
 const SLIDES = [
     {
         title: "Speak with confidence in any language.",
-        subtext: "Talkii translates your conversations in real-time, helping you navigate your new home with ease."
+        subtext: "Talki translates your conversations in real-time, helping you navigate your new home with ease."
     },
     {
         title: "Capture every detail of your conversations.",
@@ -26,7 +26,7 @@ const SLIDES = [
     },
     {
         title: "Stay organized with Smart Actions.",
-        subtext: "Talkii automatically extracts deadlines and appointments, so you never miss an important date."
+        subtext: "Talki automatically extracts deadlines and appointments, so you never miss an important date."
     }
 ];
 
@@ -96,7 +96,7 @@ export default function AuthIndex() {
 
                 <View style={styles.logoContainerSmall} pointerEvents="none">
                     <Text variant="heading2" style={{ color: theme.colors.white, fontWeight: 'bold' }}>
-                        Talkii
+                        Talki
                     </Text>
                 </View>
 
@@ -139,7 +139,7 @@ export default function AuthIndex() {
                             style={styles.signInPressable}
                         >
                             <Text variant="body" style={{ color: theme.colors.white, textAlign: 'center', opacity: 0.7 }}>
-                                v1.0.0 Talkii
+                                v1.0.0 Talki
                             </Text>
                         </Pressable>
                     </View>

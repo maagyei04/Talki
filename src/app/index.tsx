@@ -53,7 +53,7 @@ export default Index;
 export const SplashAnimation = () => {
     const mainContentPosition = useSharedValue(height / 2);
 
-    const appName = "Talkii";
+    const appName = "Talki";
     const subText = "High-performance AI for seamless communication";
 
     const mainContentStyle = useAnimatedStyle(() => {

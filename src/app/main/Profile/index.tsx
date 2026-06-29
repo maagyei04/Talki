@@ -44,7 +44,7 @@ export default function ProfileScreen() {
       if (user) {
         setProfile({
           email: user.email || '',
-          full_name: user.user_metadata?.full_name || 'Talkii User',
+          full_name: user.user_metadata?.full_name || 'Talki User',
           avatar_url: user.user_metadata?.avatar_url || null,
         });
       }
@@ -290,7 +290,7 @@ export default function ProfileScreen() {
         </Box>
 
         <Box alignItems="center" marginBottom="xxxl">
-          <Text variant="captionSmall" color="textDisabled">Talkii AI v1.0.0</Text>
+          <Text variant="captionSmall" color="textDisabled">Talki AI v1.0.0</Text>
         </Box>
       </ScrollView>
     </Box>

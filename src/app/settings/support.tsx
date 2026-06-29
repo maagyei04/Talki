@@ -4,7 +4,7 @@ import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import React from 'react';
-import { Pressable, ScrollView, StyleSheet } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet } from 'react-native';
 
 export default function SupportScreen() {
     const router = useRouter();
@@ -13,8 +13,18 @@ export default function SupportScreen() {
         await WebBrowser.openBrowserAsync(url);
     };
 
-    const sendEmail = () => {
-        Linking.openURL('mailto:support@Talkii.ai?subject=Support Request&body=Hi Talkii Team,');
+    const sendEmail = async () => {
+        const url = 'mailto:support@talki.ai?subject=Support%20Request&body=Hi%20Talki%20Team%2C';
+        const canOpen = await Linking.canOpenURL(url);
+        if (canOpen) {
+            await Linking.openURL(url);
+        } else {
+            Alert.alert(
+                'Contact Support',
+                'Reach us directly at:\nsupport@talki.ai',
+                [{ text: 'OK' }]
+            );
+        }
     };
 
     const SupportItem = ({ icon, label, onPress, isLast = false, color = '#420080ff' }: any) => (
@@ -59,24 +69,9 @@ export default function SupportScreen() {
                     <Text variant="caption" color="textSecondary" fontWeight="bold" marginBottom="small" marginLeft="nano">HELP & FEEDBACK</Text>
                     <Box>
                         <SupportItem
-                            icon="book-outline"
-                            label="Help Center"
-                            onPress={() => openLink('https://Talkii.ai/help')}
-                        />
-                        <SupportItem
                             icon="mail-outline"
                             label="Contact Support"
                             onPress={sendEmail}
-                        />
-                        <SupportItem
-                            icon="chatbubble-outline"
-                            label="Community Discord"
-                            onPress={() => openLink('https://discord.gg/Talkii')}
-                        />
-                        <SupportItem
-                            icon="bug-outline"
-                            label="Report a Bug"
-                            onPress={() => openLink('https://Talkii.ai/feedback')}
                             isLast
                         />
                     </Box>
@@ -88,20 +83,20 @@ export default function SupportScreen() {
                         <SupportItem
                             icon="document-text-outline"
                             label="Terms of Service"
-                            onPress={() => openLink('https://Talkii.ai/terms')}
+                            onPress={() => openLink('https://talki.ai/terms')}
                         />
                         <SupportItem
                             icon="shield-outline"
                             label="Privacy Policy"
-                            onPress={() => openLink('https://Talkii.ai/privacy')}
+                            onPress={() => openLink('https://talki.ai/privacy')}
                             isLast
                         />
                     </Box>
                 </Box>
 
                 <Box marginTop="xl" alignItems="center">
-                    <Text variant="captionSmall" color="textDisabled">Talkii AI for iOS & Android</Text>
-                    <Text variant="captionSmall" color="textDisabled">Version 1.0.0 (Build 20260210)</Text>
+                    <Text variant="captionSmall" color="textDisabled">Talki for iOS & Android</Text>
+                    <Text variant="captionSmall" color="textDisabled">Version 1.0.0 (Build 20260629)</Text>
                 </Box>
             </ScrollView>
         </Box>
