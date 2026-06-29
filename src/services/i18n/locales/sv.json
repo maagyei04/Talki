@@ -1,0 +1,160 @@
+{
+  "assistant": {
+    "title": "Talki-assistent",
+    "subtitle": "Sessionsintelligens",
+    "landing": {
+      "badge": "BETA-TILLGÅNG",
+      "subtitle": "Ditt privata verktyg för sessionsintelligens. Fråga om tidigare översättningar, generera smarta sammanfattningar och hitta viktiga medicinska eller juridiska fakta.",
+      "startChat": "Öppna assistentchatt",
+      "feature1": {
+        "title": "Historikmedveten",
+        "desc": "Förstår sammanhanget i alla dina tidigare sessioner."
+      },
+      "feature2": {
+        "title": "Smarta sammanfattningar",
+        "desc": "Förvandla långa inspelningar till strukturerade 3-punktsinsikter."
+      },
+      "feature3": {
+        "title": "Röst först",
+        "desc": "Intuitiv mikrofoninteraktion för handsfree-frågor."
+      }
+    },
+    "chat": {
+      "placeholder": "Fråga mig vad som helst...",
+      "transcribing": "Transkriberar...",
+      "smartSummary": "Smart sammanfattning",
+      "clearChat": "Rensa chatt",
+      "clearChatConfirm": "Rensa denna konversationshistorik?",
+      "noSessions": "Inga översättningssessioner hittades att sammanfatta.",
+      "pickSession": "Välj en session att sammanfatta",
+      "cancel": "Avbryt",
+      "summarize": "Sammanfatta",
+      "emptyTitle": "Talki-assistent",
+      "emptySubtitle": "Fråga mig vad som helst om dina tidigare sessioner, eller be om en sammanfattning.",
+      "suggestions": {
+        "prescription": "Vad nämnde läkaren om mitt recept?",
+        "summarize": "Sammanfatta mina 3 senaste sessioner",
+        "topics": "Vilka ämnen dök upp oftast i mina sessioner?",
+        "recent": "Vad hände i min senaste session?"
+      }
+    }
+  },
+  "home": {
+    "chat": "CHATT",
+    "live": "LIVE",
+    "selectLang": "Välj målspråk",
+    "streaming": "STREAMING",
+    "offline": "OFFLINE",
+    "speaking": "TALAR",
+    "originalAudio": "URSPRUNGSLJUD",
+    "voiceover": "VOICEOVER",
+    "listening": "Lyssnar...",
+    "connecting": "Ansluter...",
+    "translating": "Översätter live...",
+    "readyLive": "Redo för simultant flöde",
+    "startLive": "Starta session för att börja",
+    "emptyHome": "Tryck på knappen nedan och tala\nför att starta din konversation",
+    "processing": "Talki bearbetar...",
+    "tapToStop": "Tryck för att stoppa",
+    "tapToRecord": "Tryck för att spela in meddelande",
+    "tapToStopSession": "Tryck för att avsluta sessionen",
+    "tapToStartLive": "Tryck för att starta live-flöde",
+    "changeLangTitle": "Byt språk?",
+    "changeLangDesc": "Om du byter språk startas din live-session om. Vill du fortsätta?",
+    "change": "Ändra",
+    "playbackError": "Uppspelningsfel",
+    "playbackErrorDesc": "Kunde inte spela upp översättningsljud"
+  },
+  "history": {
+    "title": "Historik",
+    "empty": "Inga översättningar än",
+    "emptyChat": "Inga chatt-sessioner än",
+    "emptyLive": "Inga live-sessioner än",
+    "subtitle": "Dina inspelade konversationer kommer att visas här",
+    "search": "Sök i historiken...",
+    "clearAll": "Rensa alla",
+    "clearAllConfirmTitle": "Rensa hela historiken",
+    "clearAllConfirmDesc": "Detta kommer att permanent radera ALLA dina översättningar och sessioner. Är du säker?",
+    "deleteConfirm": "Radera session",
+    "deleteConfirmDesc": "Detta kommer att permanent radera denna session och alla dess delar.",
+    "turnDelete": "Radera tur",
+    "turnDeleteConfirm": "Radera denna specifika översättning?",
+    "noTurns": "Inga turer hittades.",
+    "turns_one": "tur",
+    "turns_other": "turer",
+    "labels": {
+      "said": "SADE",
+      "translated": "ÖVERSATT"
+    },
+    "date": {
+      "justNow": "Just nu",
+      "m_ago": "{{count}}m sedan",
+      "h_ago": "{{count}}t sedan",
+      "yesterday": "Igår"
+    }
+  },
+  "profile": {
+    "title": "Profil",
+    "logoutConfirmTitle": "Logga ut",
+    "logoutConfirmDesc": "Är du säker på att du vill logga ut?",
+    "stats": {
+      "translations": "ÖVERSÄTTNINGAR",
+      "languages": "SPRÅK",
+      "streak": "STREAK"
+    },
+    "sections": {
+      "account": "KONTO",
+      "preferences": "INSTÄLLNINGAR",
+      "more": "MER"
+    },
+    "items": {
+      "editProfile": "Redigera profil",
+      "notifications": "Aviseringar",
+      "privacy": "Integritet & säkerhet",
+      "language": "Språk",
+      "voice": "Föredragen röst",
+      "theme": "Tema",
+      "support": "Support",
+      "logout": "Logga ut"
+    },
+    "trialSessionsUsed": "{{count}} / {{total}} sessioner använda"
+  },
+  "paywall": {
+    "title": "Talki Premium",
+    "subtitle": "Obegränsade översättningar, liveflöde och sessionsintelligens.",
+    "features": {
+      "live": "Obegränsade Live Flow-sessioner",
+      "assistant": "Fullständig assistansintelligens",
+      "voices": "Premium HD-röster",
+      "sync": "Synkronisera historik mellan enheter"
+    },
+    "plans": {
+      "yearly": "Årlig",
+      "yearlyPrice": "49,499 € / år",
+      "yearlySavings": "Spara 20 %",
+      "monthly": "Månatlig",
+      "monthlyPrice": "4,99 € / månad",
+      "bestValue": "BÄSTA VÄRDE"
+    },
+    "restore": "Återställ köp",
+    "privacy": "Integritetspolicy",
+    "terms": "Användarvillkor"
+  },
+  "common": {
+    "cancel": "Avbryt",
+    "clear": "Rensa",
+    "delete": "Radera",
+    "save": "Spara",
+    "back": "Tillbaka",
+    "error": "Fel",
+    "all": "Alla",
+    "english": "Engelska",
+    "finnish": "Finska",
+    "swedish": "Svenska",
+    "arabic": "Arabiska",
+    "en": "Engelska",
+    "fi": "Finska",
+    "sv": "Svenska",
+    "ar": "Arabiska"
+  }
+}

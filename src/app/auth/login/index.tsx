@@ -47,6 +47,24 @@ export default function LoginScreen() {
         }
     };
 
+    const handleForgotPassword = async () => {
+        if (!email) {
+            Alert.alert('Email Required', 'Please enter your email address to reset your password.');
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const { error } = await supabase.auth.resetPasswordForEmail(email);
+            if (error) throw error;
+            Alert.alert('Success', 'A password reset link has been sent to your email.');
+        } catch (error: any) {
+            Alert.alert('Error', error.message || 'Failed to send reset link.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <KeyboardAvoidingView
             style={{ flex: 1, backgroundColor: theme.colors.background }}
@@ -71,6 +89,7 @@ export default function LoginScreen() {
                             <TextInput
                                 style={styles.input}
                                 placeholder="name@example.com"
+                                placeholderTextColor="#9CA3AF"
                                 value={email}
                                 onChangeText={setEmail}
                                 autoCapitalize="none"
@@ -84,6 +103,7 @@ export default function LoginScreen() {
                                 <TextInput
                                     style={styles.passwordInput}
                                     placeholder="••••••••"
+                                    placeholderTextColor="#9CA3AF"
                                     value={password}
                                     onChangeText={setPassword}
                                     secureTextEntry={!showPassword}
@@ -96,6 +116,11 @@ export default function LoginScreen() {
                                     />
                                 </Pressable>
                             </View>
+                            <Box alignItems="flex-end" marginTop="tiny">
+                                <Pressable onPress={handleForgotPassword}>
+                                    <Text variant="caption" color="info" fontWeight="bold">Forgot Password?</Text>
+                                </Pressable>
+                            </Box>
                         </View>
 
                         <Pressable

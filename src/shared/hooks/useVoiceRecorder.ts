@@ -84,6 +84,10 @@ export const useVoiceRecorder = () => {
         }
     }, [recorder]);
 
+    const clearRecording = useCallback(() => {
+        setRecordingUri(null);
+    }, []);
+
     useEffect(() => {
         return () => {
             if (recorderState.isRecording) {
@@ -97,5 +101,6 @@ export const useVoiceRecorder = () => {
         recordingUri,
         startRecording,
         stopRecording,
+        clearRecording,
     };
 };

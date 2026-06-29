@@ -1,9 +1,12 @@
 import { Box, Text } from '@/src/services/config';
 import { supabase } from '@/src/services/supabase';
+import { useLanguage } from '@/src/shared/contexts/LanguageContext';
+import { useTrialManager } from '@/src/shared/hooks/useTrialManager';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, ScrollView, StyleSheet } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
@@ -15,6 +18,9 @@ interface UserProfile {
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const { language: currentLanguage, isRTL } = useLanguage();
+  const { t } = useTranslation();
+  const { isPremium, sessionsUsed, presentPaywall } = useTrialManager();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [stats, setStats] = useState({ translations: 0, languages: 0, streak: 0 });
   const [loading, setLoading] = useState(true);
@@ -97,17 +103,17 @@ export default function ProfileScreen() {
 
   const handleLogout = async () => {
     Alert.alert(
-      'Logout',
-      'Are you sure you want to sign out?',
+      t('profile.logoutConfirmTitle', 'Logout'),
+      t('profile.logoutConfirmDesc', 'Are you sure you want to sign out?'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Logout',
+          text: t('profile.items.logout'),
           style: 'destructive',
           onPress: async () => {
             const { error } = await supabase.auth.signOut();
             if (error) {
-              Alert.alert('Error', error.message);
+              Alert.alert(t('common.error'), error.message);
             } else {
               router.replace('/auth');
             }
@@ -120,7 +126,7 @@ export default function ProfileScreen() {
   const SettingItem = ({ icon, label, value, onPress, isLast = false, color = '#420080ff' }: any) => (
     <Pressable onPress={onPress}>
       <Box
-        flexDirection="row"
+        flexDirection={isRTL ? "row-reverse" : "row"}
         alignItems="center"
         paddingVertical="medium"
         borderBottomWidth={isLast ? 0 : 0.5}
@@ -133,15 +139,16 @@ export default function ProfileScreen() {
           backgroundColor="backgroundSecondary"
           justifyContent="center"
           alignItems="center"
-          marginRight="medium"
+          marginLeft={isRTL ? "medium" : "none"}
+          marginRight={isRTL ? "none" : "medium"}
         >
           <Ionicons name={icon} size={20} color={color} />
         </Box>
         <Box flex={1}>
-          <Text variant="label" color="text">{label}</Text>
-          {value && <Text variant="caption" color="textSecondary">{value}</Text>}
+          <Text variant="label" color="text" textAlign={isRTL ? 'right' : 'left'}>{label}</Text>
+          {value && <Text variant="caption" color="textSecondary" textAlign={isRTL ? 'right' : 'left'}>{value}</Text>}
         </Box>
-        <Ionicons name="chevron-forward" size={16} color="#CBD5E1" />
+        <Ionicons name={isRTL ? "chevron-back" : "chevron-forward"} size={16} color="#CBD5E1" />
       </Box>
     </Pressable>
   );
@@ -176,8 +183,26 @@ export default function ProfileScreen() {
                 )}
               </Box>
               <Box flex={1}>
-                <Text variant="heading2" color="white" marginBottom="nano">{profile?.full_name || 'User'}</Text>
+                <Box flexDirection={isRTL ? "row-reverse" : "row"} alignItems="center">
+                  <Text variant="heading2" color="white" marginBottom="nano">{profile?.full_name || 'User'}</Text>
+                  {isPremium && (
+                    <Box
+                      backgroundColor="info"
+                      paddingHorizontal="small"
+                      borderRadius="sm"
+                      marginLeft={isRTL ? "none" : "small"}
+                      marginRight={isRTL ? "small" : "none"}
+                    >
+                      <Text variant="captionSmall" color="white" fontWeight="bold">PRO</Text>
+                    </Box>
+                  )}
+                </Box>
                 <Text variant="bodySmall" color="border">{profile?.email || 'user@example.com'}</Text>
+                {!isPremium && (
+                  <Text variant="captionSmall" color="white" marginTop="nano">
+                    {t('profile.trialSessionsUsed', { count: sessionsUsed, total: 3 })}
+                  </Text>
+                )}
               </Box>
             </Box>
           </Box>
@@ -189,54 +214,74 @@ export default function ProfileScreen() {
             backgroundColor="white"
             padding="medium"
             borderRadius="lg"
-            flexDirection="row"
+            flexDirection={isRTL ? "row-reverse" : "row"}
             justifyContent="space-around"
             style={styles.statsContainer}
           >
             <Box alignItems="center">
               <Text variant="subheading" color="info">{stats.translations}</Text>
-              <Text variant="captionSmall" color="textSecondary">TRANSLATIONS</Text>
+              <Text variant="captionSmall" color="textSecondary">{t('profile.stats.translations')}</Text>
             </Box>
             <Box width={1} backgroundColor="borderLight" />
             <Box alignItems="center">
               <Text variant="subheading" color="info">{stats.languages}</Text>
-              <Text variant="captionSmall" color="textSecondary">LANGUAGES</Text>
+              <Text variant="captionSmall" color="textSecondary">{t('profile.stats.languages')}</Text>
             </Box>
             <Box width={1} backgroundColor="borderLight" />
             <Box alignItems="center">
               <Text variant="subheading" color="info">{stats.streak}</Text>
-              <Text variant="captionSmall" color="textSecondary">STREAK</Text>
+              <Text variant="captionSmall" color="textSecondary">{t('profile.stats.streak')}</Text>
             </Box>
           </Box>
         </Animated.View>
 
         {/* Settings Group: Account */}
         <Box paddingHorizontal="medium" marginTop="large">
-          <Text variant="caption" color="textSecondary" fontWeight="bold" marginBottom="small" marginLeft="nano">ACCOUNT</Text>
+          <Text variant="caption" color="textSecondary" fontWeight="bold" marginBottom="small" marginLeft="nano" textAlign={isRTL ? 'right' : 'left'}>
+            {t('profile.sections.account')}
+          </Text>
           <Box>
-            <SettingItem icon="person-outline" label="Edit Profile" onPress={() => router.push('/settings/edit-profile')} />
-            <SettingItem icon="notifications-outline" label="Notifications" onPress={() => router.push('/settings/notifications')} />
-            <SettingItem icon="lock-closed-outline" label="Privacy & Security" onPress={() => router.push('/settings/privacy')} isLast />
+            <SettingItem icon="person-outline" label={t('profile.items.editProfile')} onPress={() => router.push('/settings/edit-profile')} />
+            <SettingItem icon="lock-closed-outline" label={t('profile.items.privacy')} onPress={() => router.push('/settings/privacy')} isLast />
           </Box>
         </Box>
 
         {/* Settings Group: App */}
         <Box paddingHorizontal="medium" marginTop="large">
-          <Text variant="caption" color="textSecondary" fontWeight="bold" marginBottom="small" marginLeft="nano">PREFERENCES</Text>
+          <Text variant="caption" color="textSecondary" fontWeight="bold" marginBottom="small" marginLeft="nano" textAlign={isRTL ? 'right' : 'left'}>
+            {t('profile.sections.preferences')}
+          </Text>
           <Box>
-            <SettingItem icon="mic-outline" label="Preferred Voice" value="Aura (English-US)" onPress={() => router.push('/settings/voice')} />
-            <SettingItem icon="color-palette-outline" label="Theme" value="Light Modern" onPress={() => router.push('/settings/theme')} isLast />
+            <SettingItem
+              icon="language-outline"
+              label={t('profile.items.language')}
+              value={t(`common.${(currentLanguage || 'en').toLowerCase()}`)}
+              onPress={() => router.push('/settings/language')}
+              isLast={isPremium}
+            />
+            {!isPremium && (
+              <SettingItem
+                icon="star-outline"
+                label="Go Premium"
+                value="Unlock everything"
+                color="#f59e0b"
+                onPress={presentPaywall}
+                isLast
+              />
+            )}
           </Box>
         </Box>
 
         {/* Support & Logout */}
         <Box paddingHorizontal="medium" marginTop="large" marginBottom="xxl">
-          <Text variant="caption" color="textSecondary" fontWeight="bold" marginBottom="small" marginLeft="nano">MORE</Text>
+          <Text variant="caption" color="textSecondary" fontWeight="bold" marginBottom="small" marginLeft="nano" textAlign={isRTL ? 'right' : 'left'}>
+            {t('profile.sections.more')}
+          </Text>
           <Box>
-            <SettingItem icon="help-circle-outline" label="Support" onPress={() => router.push('/settings/support')} />
+            <SettingItem icon="help-circle-outline" label={t('profile.items.support')} onPress={() => router.push('/settings/support')} />
             <SettingItem
               icon="log-out-outline"
-              label="Logout"
+              label={t('profile.items.logout')}
               color="#ff4444"
               onPress={handleLogout}
               isLast

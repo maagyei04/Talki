@@ -1,3 +1,5 @@
+import '@/src/services/i18n';
+import { initializeRevenueCat } from '@/src/services/revenueCat';
 import {
   Poppins_400Regular,
   Poppins_500Medium,
@@ -11,6 +13,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
+import { LanguageProvider } from '../shared/contexts/LanguageContext';
 import { AppThemeProvider } from '../shared/contexts/ThemeContext';
 
 import ErrorBoundary from '../shared/components/common/ErrorBoundary';
@@ -21,6 +24,9 @@ export const unstable_settings = {
 };
 
 SplashScreen.preventAutoHideAsync();
+
+// Initialize RevenueCat once at app start, before any component mounts.
+initializeRevenueCat();
 
 export default function RootLayout() {
   const [loaded] = useFonts({
@@ -43,45 +49,61 @@ export default function RootLayout() {
   return (
     <ErrorBoundary>
       <GestureHandlerRootView style={{ flex: 1 }}>
-        <AppThemeProvider>
-          <BottomSheetModalProvider>
-            <Stack
-              screenOptions={{
-                headerTitleStyle: {
-                  fontFamily: 'Poppins_600SemiBold',
-                },
-                headerBackTitleStyle: {
-                  fontFamily: 'Poppins_400Regular',
-                },
-              }}>
-              <Stack.Screen name="index" options={{ headerShown: false }} />
+        <LanguageProvider>
+          <AppThemeProvider>
+            <BottomSheetModalProvider>
+              <Stack
+                screenOptions={{
+                  headerTitleStyle: {
+                    fontFamily: 'Poppins_600SemiBold',
+                  },
+                  headerBackTitleStyle: {
+                    fontFamily: 'Poppins_400Regular',
+                  },
+                }}>
+                <Stack.Screen name="index" options={{ headerShown: false }} />
 
-              <Stack.Screen name="auth"
-                options={{
-                  headerShown: false,
-                  gestureEnabled: true,
-                  gestureDirection: 'horizontal',
-                }} />
-              <Stack.Screen name="main"
-                options={{
-                  headerShown: false,
-                  gestureEnabled: true,
-                  gestureDirection: 'horizontal',
-                }}
-              />
-              <Stack.Screen name="settings"
-                options={{
-                  headerShown: false,
-                  gestureEnabled: true,
-                  gestureDirection: 'horizontal',
-                }}
-              />
+                <Stack.Screen name="auth"
+                  options={{
+                    headerShown: false,
+                    gestureEnabled: true,
+                    gestureDirection: 'horizontal',
+                  }} />
+                <Stack.Screen name="main"
+                  options={{
+                    headerShown: false,
+                    gestureEnabled: true,
+                    gestureDirection: 'horizontal',
+                  }}
+                />
+                <Stack.Screen name="settings"
+                  options={{
+                    headerShown: false,
+                    gestureEnabled: true,
+                    gestureDirection: 'horizontal',
+                  }}
+                />
+                <Stack.Screen name="assistant"
+                  options={{
+                    headerShown: false,
+                    gestureEnabled: true,
+                    gestureDirection: 'horizontal',
+                  }}
+                />
+                <Stack.Screen name="paywall"
+                  options={{
+                    headerShown: false,
+                    presentation: 'modal',
+                    animation: 'slide_from_bottom',
+                  }}
+                />
 
-              <Stack.Screen name="+not-found" />
-            </Stack>
-            <GlobalStatusBar />
-          </BottomSheetModalProvider>
-        </AppThemeProvider>
+                <Stack.Screen name="+not-found" />
+              </Stack>
+              <GlobalStatusBar />
+            </BottomSheetModalProvider>
+          </AppThemeProvider>
+        </LanguageProvider>
       </GestureHandlerRootView>
     </ErrorBoundary>
   );

@@ -5,6 +5,8 @@ import { useVoiceRecorder } from '@/src/shared/hooks/useVoiceRecorder';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { useRouter } from 'expo-router';
+import { useTrialManager } from '@/src/shared/hooks/useTrialManager';
 import Animated, {
   FadeInDown,
   useAnimatedStyle,
@@ -64,17 +66,25 @@ const LANGUAGE_MAP: Record<string, string> = {
   vi: 'Vietnamese',
 };
 
+import { useTranslation } from 'react-i18next';
+import { I18nManager } from 'react-native';
+
 const LANG_ABBREVIATIONS: Record<string, string> = {
   Arabic: 'AR',
   Finnish: 'FI',
   English: 'EN',
+  Swedish: 'SV',
 };
 
 export default function HomeScreen() {
+  const router = useRouter();
+  const { t } = useTranslation();
+  const { canStartSession, recordSession, presentPaywall, isPremium, sessionsUsed } = useTrialManager();
+
   // --- State & Hooks ---
   const [translationMode, setTranslationMode] = useState<'standard' | 'live'>('live');
-  const [langA, setLangA] = useState<'Arabic' | 'Finnish' | 'English'>('English');
-  const [langB, setLangB] = useState<'Arabic' | 'Finnish' | 'English'>('Arabic');
+  const [langA, setLangA] = useState<'Arabic' | 'Finnish' | 'English' | 'Swedish'>('English');
+  const [langB, setLangB] = useState<'Arabic' | 'Finnish' | 'English' | 'Swedish'>('Arabic');
   const [isProcessing, setIsProcessing] = useState(false);
   const [transcription, setTranscription] = useState<Message[]>([]);
   const [detectedLang, setDetectedLang] = useState('Auto-detect');
@@ -85,7 +95,8 @@ export default function HomeScreen() {
     isRecording: isRecordingStandard,
     startRecording: startRecordingStandard,
     stopRecording: stopRecordingStandard,
-    recordingUri
+    recordingUri,
+    clearRecording: clearRecordingStandard
   } = useVoiceRecorder();
 
   // Live Mode Hook
@@ -102,7 +113,10 @@ export default function HomeScreen() {
   const player = useAudioPlayer();
   const bottomSheetModalRef = useRef<BottomSheetModal>(null);
   const snapPoints = useMemo(() => ['50%'], []);
-  const languages: Array<'Arabic' | 'Finnish' | 'English'> = ['Finnish', 'Arabic', 'English'];
+  const languages: Array<'Arabic' | 'Finnish' | 'English' | 'Swedish'> = ['Finnish', 'Arabic', 'English', 'Swedish'];
+
+  // Session Tracking for Trials
+  const sessionStartTimeRef = useRef<number | null>(null);
 
   // --- Animations ---
   const pulseScale = useSharedValue(1);
@@ -144,12 +158,12 @@ export default function HomeScreen() {
     setPickingLangType(type);
     if (isConnectedLive && translationMode === 'live') {
       Alert.alert(
-        'Change Language?',
-        'Changing the language will restart your live session. Continue?',
+        t('home.changeLangTitle'),
+        t('home.changeLangDesc'),
         [
-          { text: 'Cancel', style: 'cancel' },
+          { text: t('common.cancel'), style: 'cancel' },
           {
-            text: 'Change',
+            text: t('home.change'),
             style: 'destructive',
             onPress: async () => {
               await disconnectLive();
@@ -161,9 +175,9 @@ export default function HomeScreen() {
     } else {
       bottomSheetModalRef.current?.present();
     }
-  }, [isConnectedLive, translationMode, disconnectLive]);
+  }, [isConnectedLive, translationMode, disconnectLive, t]);
 
-  const handleLanguageSelect = useCallback((lang: 'Arabic' | 'Finnish' | 'English') => {
+  const handleLanguageSelect = useCallback((lang: 'Arabic' | 'Finnish' | 'English' | 'Swedish') => {
     if (pickingLangType === 'A') setLangA(lang);
     else setLangB(lang);
     bottomSheetModalRef.current?.dismiss();
@@ -229,6 +243,9 @@ export default function HomeScreen() {
           if (edgeError) throw edgeError;
 
           if (edgeData.message) {
+            // Record trial usage for standard mode translation
+            await recordSession();
+
             const newMessage: Message = {
               id: `${edgeData.message.id}-trans`,
               text: edgeData.message.translated_text,
@@ -245,6 +262,9 @@ export default function HomeScreen() {
             }, newMessage]);
 
             if (edgeData.audioUrl) playTranslation(edgeData.audioUrl);
+            
+            // ⚠️ FIX: Clear the recording URI from hook state so it doesn't re-process on tab switch/mount
+            clearRecordingStandard();
           }
         } catch (error: any) {
           console.error('Processing failed:', error);
@@ -255,19 +275,37 @@ export default function HomeScreen() {
       }
     };
     processAudio();
-  }, [recordingUri, translationMode]);
+  }, [recordingUri, translationMode, recordSession]);
 
   // --- User Actions ---
   const toggleRecording = async () => {
+    // Gatekeeper Check
+    if (!canStartSession) {
+      await presentPaywall();
+      return;
+    }
+
     if (translationMode === 'live') {
       if (isConnectedLive) {
+        // Ending a live session
+        const duration = sessionStartTimeRef.current ? (Date.now() - sessionStartTimeRef.current) / 1000 : 0;
         await disconnectLive();
+        sessionStartTimeRef.current = null;
+
+        // If session was > 5 seconds, record it as a trial session
+        if (duration >= 5) {
+          await recordSession();
+        }
       } else {
+        // Starting a live session
+        sessionStartTimeRef.current = Date.now();
         await connectLive();
       }
     } else {
       if (isRecordingStandard) {
         await stopRecordingStandard();
+        // For standard mode, we might want to record after a certain number of translations
+        // but the prompt specifically mentioned 5-minute sessions.
       } else {
         await startRecordingStandard();
       }
@@ -286,7 +324,7 @@ export default function HomeScreen() {
     <Box flex={1} backgroundColor="background">
       {/* Header: Controls & Languages */}
       <Box
-        flexDirection="row"
+        flexDirection={I18nManager.isRTL ? "row-reverse" : "row"}
         alignItems="center"
         justifyContent="space-between"
         paddingHorizontal="medium"
@@ -325,7 +363,7 @@ export default function HomeScreen() {
                 translationMode === 'standard' && styles.activeSegmentText
               ]}
             >
-              CHAT
+              {t('home.chat')}
             </Text>
           </Pressable>
 
@@ -350,7 +388,7 @@ export default function HomeScreen() {
                 translationMode === 'live' && styles.activeSegmentText
               ]}
             >
-              LIVE
+              {t('home.live')}
             </Text>
           </Pressable>
         </Box>
@@ -358,7 +396,7 @@ export default function HomeScreen() {
         {/* Dynamic Header Picker */}
         {translationMode === 'live' ? (
           /* Dual Language Header (LIVE) */
-          <Box flexDirection="row" alignItems="center">
+          <Box flexDirection={I18nManager.isRTL ? "row-reverse" : "row"} alignItems="center">
             <Pressable
               onPress={() => handlePresentModalPress('A')}
               style={[styles.langDisplay, { backgroundColor: '#420080ff', minWidth: 60 }]}
@@ -394,7 +432,7 @@ export default function HomeScreen() {
             style={[styles.langDisplay, { backgroundColor: '#420080ff' }]}
           >
             <Box flexDirection="row" alignItems="center">
-              <Text variant="subheading" color="white">{langB}</Text>
+              <Text variant="subheading" color="white">{t(`common.${langB.toLowerCase()}`, langB)}</Text>
               <Ionicons name="chevron-down" size={14} color="rgba(255,255,255,0.7)" style={{ marginLeft: 4 }} />
             </Box>
           </Pressable>
@@ -407,38 +445,42 @@ export default function HomeScreen() {
         <ScrollView contentContainerStyle={styles.liveContent} showsVerticalScrollIndicator={false}>
 
           {/* Status + Speech Indicator */}
-          <Box flexDirection="row" alignItems="center" justifyContent="space-between" marginBottom="xl">
-            <Box flexDirection="row" alignItems="center">
+          <Box flexDirection={I18nManager.isRTL ? "row-reverse" : "row"} alignItems="center" justifyContent="space-between" marginBottom="xl">
+            <Box flexDirection={I18nManager.isRTL ? "row-reverse" : "row"} alignItems="center">
               <Animated.View style={[styles.liveDot, isConnectedLive && liveIndicatorStyle, !isConnectedLive && { backgroundColor: '#666' }]} />
               <Text variant="caption" color={isConnectedLive ? "error" : "textSecondary"} fontWeight="bold" marginLeft="nano">
-                {isConnectedLive ? "STREAMING" : "OFFLINE"}
+                {isConnectedLive ? t('home.streaming') : t('home.offline')}
               </Text>
             </Box>
             {/* Speech Detection Indicator */}
             {isConnectedLive && isSpeakingLive && (
-              <Animated.View entering={FadeInDown} style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Animated.View style={[{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#4CAF50', marginRight: 6 }, pulseStyle]} />
-                <Text variant="caption" fontWeight="bold" style={{ color: '#4CAF50' }}>SPEAKING</Text>
+              <Animated.View entering={FadeInDown} style={{ flexDirection: I18nManager.isRTL ? 'row-reverse' : 'row', alignItems: 'center' }}>
+                <Animated.View style={[{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#4CAF50', marginRight: I18nManager.isRTL ? 0 : 6, marginLeft: I18nManager.isRTL ? 6 : 0 }, pulseStyle]} />
+                <Text variant="caption" fontWeight="bold" style={{ color: '#4CAF50' }}>{t('home.speaking')}</Text>
               </Animated.View>
             )}
           </Box>
 
           {/* Original Audio (Faded) */}
           <Box marginBottom="xl" minHeight={80} opacity={0.6}>
-            <Text variant="caption" color="textSecondary" marginBottom="small">ORIGINAL AUDIO</Text>
-            <Text variant="body" color="black" style={styles.liveTranscriptText}>
-              {transcriptLive || (isConnectedLive ? (isRecordingLive ? "Listening..." : "Connecting...") : "Ready for simultaneous flow")}
+            <Text variant="caption" color="textSecondary" marginBottom="small" textAlign={I18nManager.isRTL ? 'right' : 'left'}>
+              {t('home.originalAudio')}
+            </Text>
+            <Text variant="body" color="black" style={[styles.liveTranscriptText, { textAlign: I18nManager.isRTL ? 'right' : 'left' }]}>
+              {transcriptLive || (isConnectedLive ? (isRecordingLive ? t('home.listening') : t('home.connecting')) : t('home.readyLive'))}
             </Text>
           </Box>
 
           {/* Translation Output */}
           <Animated.View entering={FadeInDown.delay(200)} style={styles.liveTranslationContainer}>
-            <Box flexDirection="row" alignItems="center" marginBottom="medium">
+            <Box flexDirection={I18nManager.isRTL ? "row-reverse" : "row"} alignItems="center" marginBottom="medium">
               <MaterialCommunityIcons name="broadcast" size={20} color="#420080ff" />
-              <Text variant="subheading" color="info" marginLeft="small" fontWeight="bold">VOICEOVER</Text>
+              <Text variant="subheading" color="info" marginLeft={I18nManager.isRTL ? "none" : "small"} marginRight={I18nManager.isRTL ? "small" : "none"} fontWeight="bold">
+                {t('home.voiceover')}
+              </Text>
             </Box>
-            <Text variant="heading2" color="black" style={styles.liveTranslationText}>
-              {translationLive || (isConnectedLive ? "Translating live..." : "Start session to begin")}
+            <Text variant="heading2" color="black" style={[styles.liveTranslationText, { textAlign: I18nManager.isRTL ? 'right' : 'left' }]}>
+              {translationLive || (isConnectedLive ? t('home.translating') : t('home.startLive'))}
             </Text>
           </Animated.View>
         </ScrollView>
@@ -453,7 +495,7 @@ export default function HomeScreen() {
             <Box flex={1} justifyContent="center" alignItems="center" opacity={0.5}>
               <MaterialCommunityIcons name="microphone-outline" size={64} color="black" />
               <Text variant="body" marginTop="medium" textAlign="center" color="textSecondary">
-                Tap the button below and speak{'\n'}to start your conversation
+                {t('home.emptyHome')}
               </Text>
             </Box>
           ) : (
@@ -472,16 +514,16 @@ export default function HomeScreen() {
                     backgroundColor={msg.speaker === 'me' ? 'black' : 'backgroundSecondary'}
                     padding="medium"
                     borderRadius="md"
-                    flexDirection="row"
+                    flexDirection={I18nManager.isRTL ? "row-reverse" : "row"}
                     alignItems="center"
                   >
                     <Box flexShrink={1}>
-                      <Text variant="body" color={msg.speaker === 'me' ? 'white' : 'text'}>
+                      <Text variant="body" color={msg.speaker === 'me' ? 'white' : 'text'} textAlign={I18nManager.isRTL ? 'right' : 'left'}>
                         {msg.text}
                       </Text>
                     </Box>
                     {msg.audioPath && (
-                      <Box marginLeft="small">
+                      <Box marginLeft={I18nManager.isRTL ? "none" : "small"} marginRight={I18nManager.isRTL ? "small" : "none"}>
                         <Ionicons
                           name="volume-medium"
                           size={20}
@@ -496,7 +538,7 @@ export default function HomeScreen() {
           )}
           {isRecordingStandard && (
             <Box padding="small" alignSelf="center">
-              <Text variant="caption" color="info" fontWeight="bold">LISTENING...</Text>
+              <Text variant="caption" color="info" fontWeight="bold">{t('home.listening').toUpperCase()}</Text>
             </Box>
           )}
           {isProcessing && (
@@ -505,13 +547,13 @@ export default function HomeScreen() {
                 backgroundColor="backgroundSecondary"
                 padding="medium"
                 borderRadius="md"
-                flexDirection="row"
+                flexDirection={I18nManager.isRTL ? "row-reverse" : "row"}
                 alignItems="center"
                 style={{ borderStyle: 'dashed', borderWidth: 1, borderColor: '#42008033' }}
               >
                 <ActivityIndicator size="small" color="#420080ff" />
-                <Text variant="body" color="textSecondary" marginLeft="small" style={{ fontStyle: 'italic' }}>
-                  Talki is processing...
+                <Text variant="body" color="textSecondary" marginLeft={I18nManager.isRTL ? "none" : "small"} marginRight={I18nManager.isRTL ? "small" : "none"} style={{ fontStyle: 'italic' }}>
+                  {t('home.processing')}
                 </Text>
               </Box>
             </Box>
@@ -537,10 +579,10 @@ export default function HomeScreen() {
             />
           </Animated.View>
         </Pressable>
-        <Text variant="caption" color={translationMode === 'live' ? "textSecondary" : "textSecondary"} marginTop="small">
+        <Text variant="caption" color={translationMode === 'live' ? "textSecondary" : "textSecondary"} marginTop="small" textAlign="center">
           {translationMode === 'live'
-            ? (isConnectedLive ? "Tap to stop session" : "Tap to start live flow")
-            : (isRecordingStandard ? "Tap to stop" : "Tap to record message")}
+            ? (isConnectedLive ? t('home.tapToStopSession') : t('home.tapToStartLive'))
+            : (isRecordingStandard ? t('home.tapToStop') : t('home.tapToRecord'))}
         </Text>
       </Box>
 
@@ -558,15 +600,15 @@ export default function HomeScreen() {
           keyExtractor={(item: string) => item}
           ListHeaderComponent={() => (
             <Text variant="subheading" color="text" marginBottom="medium" textAlign="center">
-              Select Target Language
+              {t('home.selectLang')}
             </Text>
           )}
-          renderItem={({ item }: { item: 'Arabic' | 'Finnish' | 'English' }) => {
+          renderItem={({ item }: { item: 'Arabic' | 'Finnish' | 'English' | 'Swedish' }) => {
             const currentSelected = pickingLangType === 'A' ? langA : langB;
             return (
               <Pressable onPress={() => handleLanguageSelect(item)}>
                 <Box
-                  flexDirection="row"
+                  flexDirection={I18nManager.isRTL ? "row-reverse" : "row"}
                   alignItems="center"
                   justifyContent="space-between"
                   paddingVertical="medium"
@@ -580,7 +622,7 @@ export default function HomeScreen() {
                     color={currentSelected === item ? 'info' : 'text'}
                     fontWeight={currentSelected === item ? 'bold' : 'normal'}
                   >
-                    {item}
+                    {t(`common.${item.toLowerCase()}`, item)}
                   </Text>
                   {currentSelected === item && (
                     <Ionicons name="checkmark-circle" size={20} color="#420080ff" />

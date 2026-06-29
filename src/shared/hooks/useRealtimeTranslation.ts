@@ -32,6 +32,48 @@ export const useRealtimeTranslation = (langA: string, langB: string) => {
     const currentItemId = useRef<string | null>(null);
     const textBuffer = useRef('');
 
+    // Live session persistence
+    const liveConversationId = useRef<string | null>(null);
+    const pendingTranscript = useRef<string>('');    // buffered input (me)
+    const pendingTranslation = useRef<string>('');   // buffered output (AI)
+    const liveMessageCount = useRef<number>(0);      // tracks turns saved this session
+
+    // Helper to persist only when we have both sides of a turn
+    const tryPersistLiveTurn = useCallback(() => {
+        if (!liveConversationId.current || !pendingTranscript.current || !pendingTranslation.current) {
+            console.log('⏳ Buffer incomplete, waiting for other side of turn...', {
+                hasTranscript: !!pendingTranscript.current,
+                hasTranslation: !!pendingTranslation.current
+            });
+            return;
+        }
+
+        console.log('💾 Saving live turn to Supabase...');
+        const original = pendingTranscript.current;
+        const translated = pendingTranslation.current;
+
+        // Clear immediately to prevent double-save if another event fires
+        pendingTranscript.current = '';
+        pendingTranslation.current = '';
+
+        supabase.from('messages').insert({
+            conversation_id: liveConversationId.current,
+            speaker: 'me',
+            original_text: original,
+            translated_text: translated,
+            audio_url: null,
+        }).then(({ error }) => {
+            if (error) {
+                console.error('❌ Live message save error:', error.message);
+                // Put them back if it failed due to some transient issue? 
+                // Actually RLS is the likely cause here, so we won't retry automatically.
+            } else {
+                console.log('✅ Live message saved');
+                liveMessageCount.current += 1;
+            }
+        });
+    }, []);
+
     // Connection
     const heartbeatInterval = useRef<NodeJS.Timeout | null>(null);
     const shouldReconnect = useRef(false);
@@ -46,7 +88,11 @@ export const useRealtimeTranslation = (langA: string, langB: string) => {
             sound.setOnPlaybackStatusUpdate((status) => {
                 if (status.isLoaded && status.didJustFinish) {
                     sound.unloadAsync();
-                    isAISpeaking.current = false; // Unlock only after chime is done
+                    // 500ms post-speech lockout — keeps the mic gated briefly after
+                    // the chime ends to prevent "ghost" triggers from the AI's own audio tail
+                    setTimeout(() => {
+                        isAISpeaking.current = false;
+                    }, 500);
                 }
             });
         } catch (err) {
@@ -211,8 +257,10 @@ export const useRealtimeTranslation = (langA: string, langB: string) => {
                     - Treats non-${langA}/non-${langB} audio as background noise/silence.
                     
                     BIDIRECTIONAL LOGIC:
-                    - IF you detect ${langB} -> Translate into ${langA}.
-                    - IF you detect ${langA} -> Translate into ${langB}.
+                    - You are a bridge between ${langA} and ${langB}.
+                    - IF the user speaks ${langA}, you MUST translate it into ${langB}.
+                    - IF the user speaks ${langB}, you MUST translate it into ${langA}.
+                    - Continuously listen for both languages and swap the target language automatically based on what you hear.
                     
                     EXAMPLES:
                     1. Input (${langA}): "Where is the nearest pharmacy?"
@@ -233,14 +281,16 @@ export const useRealtimeTranslation = (langA: string, langB: string) => {
                     temperature: 0.6,
                     turn_detection: {
                         type: 'server_vad',
-                        threshold: 0.6,
+                        // Lowered from 0.8 → 0.7: 0.8 might have been too aggressive.
+                        threshold: 0.7,
                         prefix_padding_ms: 300,
-                        silence_duration_ms: 1000
+                        // Extended from 1000 → 1200ms: gives more breathing room
+                        // before the model decides the speaker has finished
+                        silence_duration_ms: 1200
                     },
                     input_audio_format: 'pcm16',
                     input_audio_transcription: {
                         model: 'whisper-1',
-                        language: (langA === 'English' || langB === 'English') ? 'en' : undefined
                     }
                 }
             }));
@@ -248,7 +298,9 @@ export const useRealtimeTranslation = (langA: string, langB: string) => {
 
         ws.current.onmessage = (event) => {
             const msg: WebSocketMessage = JSON.parse(event.data);
-
+            if (msg.type !== 'input_audio_buffer.append') {
+                console.log('📡 WS Event:', msg.type);
+            }
             switch (msg.type) {
                 // Input transcription (what the speaker said)
                 case 'conversation.item.input_audio_transcription.delta':
@@ -261,8 +313,10 @@ export const useRealtimeTranslation = (langA: string, langB: string) => {
                     break;
 
                 case 'conversation.item.input_audio_transcription.completed':
-                    console.log('Detected transcription:', msg.transcript);
+                    console.log('🎤 Input transcription completed:', msg.transcript);
                     setTranscript(msg.transcript || '');
+                    pendingTranscript.current = msg.transcript || '';
+                    tryPersistLiveTurn();
                     break;
 
                 case 'response.text.delta':
@@ -275,9 +329,12 @@ export const useRealtimeTranslation = (langA: string, langB: string) => {
                     }
                     break;
 
-                case 'response.audio_transcript.completed':
+                case 'response.audio_transcript.done':
                     if (msg.transcript) {
+                        console.log('🤖 AI translation completed:', msg.transcript);
                         setTranslation(msg.transcript);
+                        pendingTranslation.current = msg.transcript;
+                        tryPersistLiveTurn();
                     }
                     break;
 
@@ -290,6 +347,7 @@ export const useRealtimeTranslation = (langA: string, langB: string) => {
                     break;
 
                 case 'input_audio_buffer.speech_started':
+                    console.log('🎙️ Speech started');
                     setIsSpeaking(true);
                     setTranscript(''); // Clear previous for a fresh 'Live' feel
                     setTranslation('');
@@ -303,6 +361,7 @@ export const useRealtimeTranslation = (langA: string, langB: string) => {
                     break;
 
                 case 'input_audio_buffer.speech_stopped':
+                    console.log('🛑 Speech stopped');
                     setIsSpeaking(false);
                     Haptics.selectionAsync();
                     break;
@@ -353,6 +412,22 @@ export const useRealtimeTranslation = (langA: string, langB: string) => {
             sessionToken.current = session.access_token;
             shouldReconnect.current = true;
 
+            // Create a new live conversation row for this session
+            liveMessageCount.current = 0;
+            pendingTranscript.current = '';
+            pendingTranslation.current = '';
+            const { data: conv, error: convError } = await supabase
+                .from('conversations')
+                .insert({ user_id: session.user.id, target_lang: langB, mode: 'live', lang_a: langA })
+                .select()
+                .single();
+            if (!convError && conv) {
+                liveConversationId.current = conv.id;
+                console.log('📝 Live conversation created:', conv.id);
+            } else {
+                console.error('Failed to create live conversation:', convError?.message);
+            }
+
             setupWebSocket(session.access_token);
 
             try {
@@ -397,6 +472,17 @@ export const useRealtimeTranslation = (langA: string, langB: string) => {
 
         if (ws.current) { ws.current.close(); ws.current = null; }
         try { await stopRecording(); } catch { }
+
+        // Clean up empty live session (no turns were spoken)
+        if (liveConversationId.current && liveMessageCount.current === 0) {
+            supabase.from('conversations').delete()
+                .eq('id', liveConversationId.current)
+                .then(() => console.log('🗑️ Empty live session removed'));
+        }
+        liveConversationId.current = null;
+        liveMessageCount.current = 0;
+        pendingTranscript.current = '';
+        pendingTranslation.current = '';
 
         setIsConnected(false);
         setTranscript('');

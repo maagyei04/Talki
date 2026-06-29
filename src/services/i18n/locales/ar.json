@@ -1,0 +1,160 @@
+{
+  "assistant": {
+    "title": "مساعد Talki",
+    "subtitle": "ذكاء الجلسة",
+    "landing": {
+      "badge": "وصول تجريبي",
+      "subtitle": "أداة ذكاء الجلسة الخاصة بك. اسأل عن الترجمات السابقة، وقم بإنشاء ملخصات ذكية، واطلع على الحقائق الطبية أو القانونية الرئيسية.",
+      "startChat": "افتح دردشة المساعد",
+      "feature1": {
+        "title": "واعي بالتاريخ",
+        "desc": "يفهم سياق جميع جلساتك السابقة."
+      },
+      "feature2": {
+        "title": "ملخصات ذكية",
+        "desc": "حول التسجيلات الطويلة إلى رؤايا منظمة في 3 نقاط."
+      },
+      "feature3": {
+        "title": "الصوت أولاً",
+        "desc": "تفاعل ميكروفون حدسي للاستفسارات بدون استخدام اليدين."
+      }
+    },
+    "chat": {
+      "placeholder": "اسألني عن أي شيء...",
+      "transcribing": "جاري النسخ...",
+      "smartSummary": "ملخص ذكي",
+      "clearChat": "مسح الدردشة",
+      "clearChatConfirm": "هل تريد مسح سجل هذه المحادثة؟",
+      "noSessions": "لم يتم العثور على جلسات ترجمة لتلخيصها.",
+      "pickSession": "اختر جلسة لتلخيصها",
+      "cancel": "إلغاء",
+      "summarize": "تلخيص",
+      "emptyTitle": "مساعد Talki",
+      "emptySubtitle": "اسألني عن أي شيء بخصوص جلساتك السابقة، أو اطلب ملخصاً.",
+      "suggestions": {
+        "prescription": "ماذا ذكر الطبيب عن وصفتي الطبية؟",
+        "summarize": "لخص آخر 3 جلسات لي",
+        "topics": "ما هي المواضيع التي ظهرت بشكل متكرر في جلساتي؟",
+        "recent": "ماذا حدث في آخر جلسة لي؟"
+      }
+    }
+  },
+  "home": {
+    "chat": "دردشة",
+    "live": "مباشر",
+    "selectLang": "اختر اللغة المستهدفة",
+    "streaming": "بث مباشر",
+    "offline": "غير متصل",
+    "speaking": "يتحدث",
+    "originalAudio": "الصوت الأصلي",
+    "voiceover": "التعليق الصوتي",
+    "listening": "جاري الاستماع...",
+    "connecting": "جاري الاتصال...",
+    "translating": "جاري الترجمة الفورية...",
+    "readyLive": "جاهز للتدفق المتزامن",
+    "startLive": "ابدأ الجلسة للبدء",
+    "emptyHome": "اضغط على الزر أدناه وتحدث\nلبدء محادثتك",
+    "processing": "Talki يقوم بالمعالجة...",
+    "tapToStop": "اضغط للتوقف",
+    "tapToRecord": "اضغط لتسجيل رسالة",
+    "tapToStopSession": "اضغط لإنهاء الجلسة",
+    "tapToStartLive": "اضغط لبدء البث المباشر",
+    "changeLangTitle": "تغيير اللغة؟",
+    "changeLangDesc": "تغيير اللغة سيؤدي إلى إعادة تشغيل جلستك المباشرة. هل تريد الاستمرار؟",
+    "change": "تغيير",
+    "playbackError": "خطأ في التشغيل",
+    "playbackErrorDesc": "تعذر تشغيل صوت الترجمة"
+  },
+  "history": {
+    "title": "السجل",
+    "empty": "لا توجد ترجمات بعد",
+    "emptyChat": "لا توجد جلسات دردشة بعد",
+    "emptyLive": "لا توجد جلسات مباشرة بعد",
+    "subtitle": "ستظهر محادثاتك المسجلة هنا",
+    "search": "بحث في السجل...",
+    "clearAll": "مسح الكل",
+    "clearAllConfirmTitle": "مسح كل السجل",
+    "clearAllConfirmDesc": "سيؤدي هذا إلى حذف جميع ترجماتك وجلساتك نهائيًا. هل أنت متأكد؟",
+    "deleteConfirm": "حذف الجلسة",
+    "deleteConfirmDesc": "سيؤدي هذا إلى حذف هذه الجلسة وجميع محادثاتها نهائيًا.",
+    "turnDelete": "حذف المحادثة",
+    "turnDeleteConfirm": "حذف هذه الترجمة المحددة؟",
+    "noTurns": "لم يتم العثور على محادثات.",
+    "turns_one": "محادثة",
+    "turns_other": "محادثات",
+    "labels": {
+      "said": "قال",
+      "translated": "مترجم"
+    },
+    "date": {
+      "justNow": "الآن",
+      "m_ago": "منذ {{count}} دقيقة",
+      "h_ago": "منذ {{count}} ساعة",
+      "yesterday": "أمس"
+    }
+  },
+  "profile": {
+    "title": "الملف الشخصي",
+    "logoutConfirmTitle": "تسجيل الخروج",
+    "logoutConfirmDesc": "هل أنت متأكد أنك تريد تسجيل الخروج؟",
+    "stats": {
+      "translations": "الترجمات",
+      "languages": "اللغات",
+      "streak": "التتابعية"
+    },
+    "sections": {
+      "account": "الحساب",
+      "preferences": "التفضيلات",
+      "more": "المزيد"
+    },
+    "items": {
+      "editProfile": "تعديل الملف الشخصي",
+      "notifications": "الإشعارات",
+      "privacy": "الخصوصية والأمان",
+      "language": "اللغة",
+      "voice": "الصوت المفضل",
+      "theme": "المظهر",
+      "support": "الدعم",
+      "logout": "تسجيل الخروج"
+    },
+    "trialSessionsUsed": "تم استخدام {{count}} / {{total}} جلسات"
+  },
+  "paywall": {
+    "title": "Talki بريميوم",
+    "subtitle": "ترجمات غير محدودة، تدفق مباشر، وذكاء الجلسة.",
+    "features": {
+      "live": "جلسات تدفق مباشر غير محدودة",
+      "assistant": "ذكاء مساعد كامل",
+      "voices": "أصوات HD مميزة",
+      "sync": "مزامنة السجل عبر الأجهزة"
+    },
+    "plans": {
+      "yearly": "سنوي",
+      "yearlyPrice": "49.499 € / سنة",
+      "yearlySavings": "وفر 20%",
+      "monthly": "شهري",
+      "monthlyPrice": "4.99 € / شهر",
+      "bestValue": "أفضل قيمة"
+    },
+    "restore": "استعادة المشتريات",
+    "privacy": "سياسة الخصوصية",
+    "terms": "شروط الخدمة"
+  },
+  "common": {
+    "cancel": "إلغاء",
+    "clear": "مسح",
+    "delete": "حذف",
+    "save": "حفظ",
+    "back": "رجوع",
+    "error": "خطأ",
+    "all": "الكل",
+    "english": "الإنجليزية",
+    "finnish": "الفنلندية",
+    "swedish": "السويدية",
+    "arabic": "العربية",
+    "en": "الإنجليزية",
+    "fi": "الفنلندية",
+    "sv": "السويدية",
+    "ar": "العربية"
+  }
+}

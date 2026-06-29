@@ -1,0 +1,160 @@
+{
+  "assistant": {
+    "title": "Talki-avustaja",
+    "subtitle": "Istuntoäly",
+    "landing": {
+      "badge": "BETA-KÄYTTÖ",
+      "subtitle": "Yksityinen istuntoälytyökalusi. Kysy aiemmista käännöksistä, luo älykkäitä yhteenvetoja ja etsi tärkeitä lääketieteellisiä tai oikeudellisia faktoja.",
+      "startChat": "Avaa avustajan chat",
+      "feature1": {
+        "title": "Historiatietoinen",
+        "desc": "Ymmärtää kaikkien aiempien istuntojesi kontekstin."
+      },
+      "feature2": {
+        "title": "Älykkäät yhteenvedot",
+        "desc": "Muuta pitkät tallenteet jäsennellyiksi 3 kohdan oivalluksiksi."
+      },
+      "feature3": {
+        "title": "Ääni edellä",
+        "desc": "Intuitiivinen mikrofonivuorovaikutus handsfree-kyselyihin."
+      }
+    },
+    "chat": {
+      "placeholder": "Kysy minulta mitä vain...",
+      "transcribing": "Litteroidaan...",
+      "smartSummary": "Älykäs yhteenveto",
+      "clearChat": "Tyhjennä chat",
+      "clearChatConfirm": "Tyhjennetäänkö tämä keskusteluhistoria?",
+      "noSessions": "Yhteenvetoon sopivia käännösistuntoja ei löytynyt.",
+      "pickSession": "Valitse istunto yhteenvedolle",
+      "cancel": "Peruuta",
+      "summarize": "Tiivistä",
+      "emptyTitle": "Talki-avustaja",
+      "emptySubtitle": "Kysy minulta mitä vain aiemmista istunnoistasi tai pyydä yhteenveto.",
+      "suggestions": {
+        "prescription": "Mitä lääkäri mainitsi reseptistäni?",
+        "summarize": "Tiivistä 3 viimeisintä istuntoani",
+        "topics": "Mitä aiheita istunnoissani esiintyi useimmin?",
+        "recent": "Mitä viimeisimmässä istunnossani tapahtui?"
+      }
+    }
+  },
+  "home": {
+    "chat": "CHAT",
+    "live": "LIVE",
+    "selectLang": "Valitse kohdekieli",
+    "streaming": "STRIIMAUS",
+    "offline": "OFFLINE",
+    "speaking": "PUHUU",
+    "originalAudio": "ALKUPERÄINEN ÄÄNI",
+    "voiceover": "SEL喧ÄÄNI",
+    "listening": "Kuunnellaan...",
+    "connecting": "Yhdistetään...",
+    "translating": "Käännetään livenä...",
+    "readyLive": "Valmis samanaikaiseen virtaan",
+    "startLive": "Aloita istunto aloittaaksesi",
+    "emptyHome": "Napauta painiketta ja puhu\naloittaaksesi keskustelun",
+    "processing": "Talki käsittelee...",
+    "tapToStop": "Lopeta napauttamalla",
+    "tapToRecord": "Tallenna viesti napauttamalla",
+    "tapToStopSession": "Lopeta istunto napauttamalla",
+    "tapToStartLive": "Aloita live-virta napauttamalla",
+    "changeLangTitle": "Vaihda kieltä?",
+    "changeLangDesc": "Kielen vaihtaminen käynnistää live-istunnon uudelleen. Jatketaanko?",
+    "change": "Vaihda",
+    "playbackError": "Toistovirhe",
+    "playbackErrorDesc": "Käännösääntä ei voitu toistaa"
+  },
+  "history": {
+    "title": "Historia",
+    "empty": "Ei vielä käännöksiä",
+    "emptyChat": "Ei vielä chat-istuntoja",
+    "emptyLive": "Ei vielä live-istuntoja",
+    "subtitle": "Tallennetut keskustelusi näkyvät täällä",
+    "search": "Hae historiasta...",
+    "clearAll": "Tyhjennä kaikki",
+    "clearAllConfirmTitle": "Tyhjennä koko historia",
+    "clearAllConfirmDesc": "Tämä poistaa lopullisesti KAIKKI käännöksesi ja istuntosi. Oletko varma?",
+    "deleteConfirm": "Poista istunto",
+    "deleteConfirmDesc": "Tämä poistaa lopullisesti tämän istunnon ja kaikki sen osat.",
+    "turnDelete": "Poista vuoro",
+    "turnDeleteConfirm": "Poistetaanko tämä tietty käännös?",
+    "noTurns": "Vuoroja ei löytynyt.",
+    "turns_one": "vuoro",
+    "turns_other": "vuoroa",
+    "labels": {
+      "said": "SANOI",
+      "translated": "KÄÄNNETTY"
+    },
+    "date": {
+      "justNow": "Juuri nyt",
+      "m_ago": "{{count}}m sitten",
+      "h_ago": "{{count}}h sitten",
+      "yesterday": "Eilen"
+    }
+  },
+  "profile": {
+    "title": "Profiili",
+    "logoutConfirmTitle": "Kirjaudu ulos",
+    "logoutConfirmDesc": "Haluatko varmasti kirjautua ulos?",
+    "stats": {
+      "translations": "KÄÄNNÖKSET",
+      "languages": "KIELET",
+      "streak": "PUTKI"
+    },
+    "sections": {
+      "account": "TILI",
+      "preferences": "ASETUKSET",
+      "more": "LISÄÄ"
+    },
+    "items": {
+      "editProfile": "Muokkaa profiilia",
+      "notifications": "Ilmoitukset",
+      "privacy": "Tietosuoja ja turvallisuus",
+      "language": "Kieli",
+      "voice": "Suosikkiääni",
+      "theme": "Teema",
+      "support": "Tuki",
+      "logout": "Kirjaudu ulos"
+    },
+    "trialSessionsUsed": "{{count}} / {{total}} istuntoa käytetty"
+  },
+  "paywall": {
+    "title": "Talki Premium",
+    "subtitle": "Rajoittamattomat käännökset, live-virta ja istuntoäly.",
+    "features": {
+      "live": "Rajoittamattomat Live Flow -istunnot",
+      "assistant": "Täysi avustajaäly",
+      "voices": "Premium HD -äänet",
+      "sync": "Synkronoi historia laitteiden välillä"
+    },
+    "plans": {
+      "yearly": "Vuosittain",
+      "yearlyPrice": "49,499 € / vuosi",
+      "yearlySavings": "Säästä 20 %",
+      "monthly": "Kuukausittain",
+      "monthlyPrice": "4,99 € / kuukausi",
+      "bestValue": "PARAS ARVO"
+    },
+    "restore": "Palauta ostot",
+    "privacy": "Tietosuojakäytäntö",
+    "terms": "Käyttöehdot"
+  },
+  "common": {
+    "cancel": "Peruuta",
+    "clear": "Tyhjennä",
+    "delete": "Poista",
+    "save": "Tallenna",
+    "back": "Takaisin",
+    "error": "Virhe",
+    "all": "Kaikki",
+    "english": "Englanti",
+    "finnish": "Suomi",
+    "swedish": "Ruotsi",
+    "arabic": "Arabia",
+    "en": "Englanti",
+    "fi": "Suomi",
+    "sv": "Ruotsi",
+    "ar": "Arabia"
+  }
+}

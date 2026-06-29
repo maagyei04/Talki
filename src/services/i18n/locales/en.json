@@ -1,0 +1,160 @@
+{
+  "assistant": {
+    "title": "Talki Assistant",
+    "subtitle": "Session AI",
+    "landing": {
+      "badge": "BETA ACCESS",
+      "subtitle": "Your private Session Intelligence tool. Ask about past translations, generate smart summaries, and surface key medical or legal facts.",
+      "startChat": "Open Assistant Chat",
+      "feature1": {
+        "title": "History Conscious",
+        "desc": "Understands the context of all your past sessions."
+      },
+      "feature2": {
+        "title": "Smart Summaries",
+        "desc": "Turn long recordings into structured 3-bullet insights."
+      },
+      "feature3": {
+        "title": "Voice First",
+        "desc": "Intuitive microphone interaction for hands-free queries."
+      }
+    },
+    "chat": {
+      "placeholder": "Ask me anything...",
+      "transcribing": "Transcribing...",
+      "smartSummary": "Smart Summary",
+      "clearChat": "Clear Chat",
+      "clearChatConfirm": "Clear this conversation history?",
+      "noSessions": "No translation sessions found to summarize.",
+      "pickSession": "Pick a session to summarize",
+      "cancel": "Cancel",
+      "summarize": "Summarize",
+      "emptyTitle": "Talki Assistant",
+      "emptySubtitle": "Ask me anything about your past sessions, or request a summary.",
+      "suggestions": {
+        "prescription": "What did the doctor mention about my prescription?",
+        "summarize": "Summarize my last 3 sessions",
+        "topics": "What topics came up most in my sessions?",
+        "recent": "What happened in my most recent session?"
+      }
+    }
+  },
+  "home": {
+    "chat": "CHAT",
+    "live": "LIVE",
+    "selectLang": "Select Target Language",
+    "streaming": "STREAMING",
+    "offline": "OFFLINE",
+    "speaking": "SPEAKING",
+    "originalAudio": "ORIGINAL AUDIO",
+    "voiceover": "VOICEOVER",
+    "listening": "Listening...",
+    "connecting": "Connecting...",
+    "translating": "Translating live...",
+    "readyLive": "Ready for simultaneous flow",
+    "startLive": "Start session to begin",
+    "emptyHome": "Tap the button below and speak\nto start your conversation",
+    "processing": "Talki is processing...",
+    "tapToStop": "Tap to stop",
+    "tapToRecord": "Tap to record message",
+    "tapToStopSession": "Tap to stop session",
+    "tapToStartLive": "Tap to start live flow",
+    "changeLangTitle": "Change Language?",
+    "changeLangDesc": "Changing the language will restart your live session. Continue?",
+    "change": "Change",
+    "playbackError": "Playback Error",
+    "playbackErrorDesc": "Could not play translation audio"
+  },
+  "history": {
+    "title": "History",
+    "empty": "No translations yet",
+    "emptyChat": "No chat sessions yet",
+    "emptyLive": "No live sessions yet",
+    "subtitle": "Your recorded conversations will appear here",
+    "search": "Search history...",
+    "clearAll": "Clear All",
+    "clearAllConfirmTitle": "Clear All History",
+    "clearAllConfirmDesc": "This will permanently delete ALL your translations and sessions. Are you sure?",
+    "deleteConfirm": "Delete Session",
+    "deleteConfirmDesc": "This will permanently delete this session and all its turns.",
+    "turnDelete": "Delete Turn",
+    "turnDeleteConfirm": "Delete this particular translation?",
+    "noTurns": "No turns found.",
+    "turns_one": "turn",
+    "turns_other": "turns",
+    "labels": {
+      "said": "SAID",
+      "translated": "TRANSLATED"
+    },
+    "date": {
+      "justNow": "Just now",
+      "m_ago": "{{count}}m ago",
+      "h_ago": "{{count}}h ago",
+      "yesterday": "Yesterday"
+    }
+  },
+  "profile": {
+    "title": "Profile",
+    "logoutConfirmTitle": "Logout",
+    "logoutConfirmDesc": "Are you sure you want to sign out?",
+    "stats": {
+      "translations": "TRANSLATIONS",
+      "languages": "LANGUAGES",
+      "streak": "STREAK"
+    },
+    "sections": {
+      "account": "ACCOUNT",
+      "preferences": "PREFERENCES",
+      "more": "MORE"
+    },
+    "items": {
+      "editProfile": "Edit Profile",
+      "notifications": "Notifications",
+      "privacy": "Privacy & Security",
+      "language": "Language",
+      "voice": "Preferred Voice",
+      "theme": "Theme",
+      "support": "Support",
+      "logout": "Logout"
+    },
+    "trialSessionsUsed": "{{count}} / {{total}} sessions used"
+  },
+  "paywall": {
+    "title": "Talki Premium",
+    "subtitle": "Unlimited translations, live flow, and session intelligence.",
+    "features": {
+      "live": "Unlimited Live Flow Sessions",
+      "assistant": "Full Assistant Intelligence",
+      "voices": "Premium HD Voices",
+      "sync": "Sync History Across Devices"
+    },
+    "plans": {
+      "yearly": "Yearly",
+      "yearlyPrice": "€49.499 / year",
+      "yearlySavings": "Save 20%",
+      "monthly": "Monthly",
+      "monthlyPrice": "€4.99 / month",
+      "bestValue": "BEST VALUE"
+    },
+    "restore": "Restore Purchases",
+    "privacy": "Privacy Policy",
+    "terms": "Terms of Service"
+  },
+  "common": {
+    "cancel": "Cancel",
+    "clear": "Clear",
+    "delete": "Delete",
+    "save": "Save",
+    "back": "Back",
+    "error": "Error",
+    "all": "All",
+    "english": "English",
+    "finnish": "Finnish",
+    "swedish": "Swedish",
+    "arabic": "Arabic",
+    "en": "English",
+    "fi": "Finnish",
+    "sv": "Swedish",
+    "ar": "Arabic"
+  }
+}
