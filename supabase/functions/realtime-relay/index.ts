@@ -53,8 +53,7 @@ serve(async (req: Request) => {
         const url = `wss://api.openai.com/v1/realtime?model=gpt-4o-mini-realtime-preview`;
         const openAiSocket = new WebSocket(url, [
             'realtime',
-            'openai-insecure-api-key.' + openAiKey,
-            'openai-beta.realtime-v1'
+            'openai-insecure-api-key.' + openAiKey
         ]);
 
         const messageQueue: string[] = [];
