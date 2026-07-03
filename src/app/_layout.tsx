@@ -13,6 +13,8 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
+import { supabase } from '@/src/services/supabase';
+import Purchases from 'react-native-purchases';
 import { LanguageProvider } from '../shared/contexts/LanguageContext';
 import { AppThemeProvider } from '../shared/contexts/ThemeContext';
 
@@ -41,6 +43,21 @@ export default function RootLayout() {
       SplashScreen.hideAsync();
     }
   }, [loaded]);
+
+  // Global auth listener to sync RevenueCat user ID
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session?.user) {
+        Purchases.logIn(session.user.id).catch(console.error);
+      } else if (event === 'SIGNED_OUT') {
+        Purchases.logOut().catch(console.error);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
 
   if (!loaded) {
     return null;
