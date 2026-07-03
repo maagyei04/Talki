@@ -277,7 +277,12 @@ export const useRealtimeTranslation = (langA: string, langB: string) => {
                     - TRANSLATE EVERYTHING LITERALLY.
                     `,
                     modalities: ['text', 'audio'],
-                    voice: 'shimmer',
+                    type: 'realtime',
+                    audio: {
+                        output: {
+                            voice: 'shimmer',
+                        }
+                    },
                     temperature: 0.6,
                     turn_detection: {
                         type: 'server_vad',
@@ -319,8 +324,8 @@ export const useRealtimeTranslation = (langA: string, langB: string) => {
                     tryPersistLiveTurn();
                     break;
 
-                case 'response.text.delta':
-                case 'response.audio_transcript.delta':
+                case 'response.output_text.delta':
+                case 'response.output_audio_transcript.delta':
                     if (msg.response_id !== currentResponseId.current) {
                         currentResponseId.current = msg.response_id || null;
                         setTranslation(msg.delta || '');
@@ -329,7 +334,7 @@ export const useRealtimeTranslation = (langA: string, langB: string) => {
                     }
                     break;
 
-                case 'response.audio_transcript.done':
+                case 'response.output_audio_transcript.done':
                     if (msg.transcript) {
                         console.log('🤖 AI translation completed:', msg.transcript);
                         setTranslation(msg.transcript);
@@ -338,11 +343,11 @@ export const useRealtimeTranslation = (langA: string, langB: string) => {
                     }
                     break;
 
-                case 'response.audio.delta':
+                case 'response.output_audio.delta':
                     if (msg.delta) audioDeltas.current.push(msg.delta);
                     break;
 
-                case 'response.audio.done':
+                case 'response.output_audio.done':
                     playOpenAIAudio(); // Play the accumulated audio
                     break;
 
