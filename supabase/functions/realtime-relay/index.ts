@@ -73,7 +73,7 @@ serve(async (req: Request) => {
             const data = JSON.parse(event.data);
 
             // diagnostic logging for audio flow
-            if (data.type === 'response.audio.delta') {
+            if (data.type === 'response.output_audio.delta') {
                 audioDeltaCount++;
                 if (audioDeltaCount % 20 === 0) {
                     console.log(`Forwarded ${audioDeltaCount} audio deltas to user ${user.id}`);
