@@ -50,13 +50,12 @@ serve(async (req: Request) => {
 
         // 4. Connect to OpenAI Realtime Translation API
         // Using the dedicated /v1/realtime/translations endpoint with gpt-realtime-translate model
+        // For environments where you cannot set headers (like standard Deno WebSocket), OpenAI supports passing the key as a subprotocol
         const url = `wss://api.openai.com/v1/realtime/translations?model=gpt-realtime-translate`;
-        const openAiSocket = new WebSocket(url, {
-            headers: {
-                Authorization: `Bearer ${openAiKey}`,
-                "OpenAI-Safety-Identifier": user.id,
-            },
-        } as ConstructorParameters<typeof WebSocket>[1]);
+        const openAiSocket = new WebSocket(url, [
+            'realtime',
+            'openai-insecure-api-key.' + openAiKey
+        ]);
 
         const messageQueue: string[] = [];
         let openAiReady = false;
