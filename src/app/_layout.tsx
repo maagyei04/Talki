@@ -15,6 +15,8 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
 import { supabase } from '@/src/services/supabase';
 import Purchases from 'react-native-purchases';
+import * as Updates from 'expo-updates';
+import { Alert } from 'react-native';
 import { LanguageProvider } from '../shared/contexts/LanguageContext';
 import { AppThemeProvider } from '../shared/contexts/ThemeContext';
 
@@ -37,6 +39,22 @@ export default function RootLayout() {
     Poppins_600SemiBold,
     Poppins_700Bold,
   });
+
+  const { isUpdateAvailable, isUpdatePending } = Updates.useUpdates();
+
+  // Check for OTA updates
+  useEffect(() => {
+    if (isUpdatePending) {
+      Alert.alert(
+        'Update Available',
+        'A new version of Talki has been downloaded. Restart the app to apply the update?',
+        [
+          { text: 'Later', style: 'cancel' },
+          { text: 'Restart Now', onPress: () => Updates.reloadAsync() },
+        ]
+      );
+    }
+  }, [isUpdatePending]);
 
   useEffect(() => {
     if (loaded) {
