@@ -50,7 +50,7 @@ serve(async (req: Request) => {
 
         // 4. Connect to OpenAI Realtime API
         // For environments where you cannot set headers, OpenAI supports passing the key as a subprotocol
-        const url = `wss://api.openai.com/v1/realtime?model=gpt-4o-mini-realtime-preview`;
+        const url = `wss://api.openai.com/v1/realtime?model=gpt-4o-mini-realtime-preview-2024-12-17`;
         const openAiSocket = new WebSocket(url, [
             'realtime',
             'openai-insecure-api-key.' + openAiKey
