@@ -25,7 +25,6 @@
     "axios": "^1.13.3",
     "expo": "~54.0.32",
     "expo-audio": "~1.1.1",
-    "expo-av": "~16.0.8",
     "expo-blur": "~15.0.8",
     "expo-constants": "~18.0.13",
     "expo-dev-client": "~6.0.20",
