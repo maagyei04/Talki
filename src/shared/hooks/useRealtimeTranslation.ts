@@ -13,6 +13,32 @@ interface WebSocketMessage {
     [key: string]: any;
 }
 
+const LANGUAGE_CODE_MAP: Record<string, string> = {
+    'Afrikaans': 'af', 'Arabic': 'ar', 'Azerbaijani': 'az', 'Belarusian': 'be',
+    'Bulgarian': 'bg', 'Bosnian': 'bs', 'Catalan': 'ca', 'Czech': 'cs',
+    'Welsh': 'cy', 'Danish': 'da', 'German': 'de', 'Greek': 'el',
+    'English': 'en', 'Spanish': 'es', 'Estonian': 'et', 'Persian': 'fa',
+    'Finnish': 'fi', 'French': 'fr', 'Galician': 'gl', 'Hebrew': 'he',
+    'Hindi': 'hi', 'Croatian': 'hr', 'Hungarian': 'hu', 'Armenian': 'hy',
+    'Indonesian': 'id', 'Icelandic': 'is', 'Italian': 'it', 'Japanese': 'ja',
+    'Kazakh': 'kk', 'Kannada': 'kn', 'Korean': 'ko', 'Lithuanian': 'lt',
+    'Latvian': 'lv', 'Maori': 'mi', 'Macedonian': 'mk', 'Marathi': 'mr',
+    'Malay': 'ms', 'Nepali': 'ne', 'Dutch': 'nl', 'Norwegian': 'no',
+    'Polish': 'pl', 'Portuguese': 'pt', 'Romanian': 'ro', 'Russian': 'ru',
+    'Slovak': 'sk', 'Slovenian': 'sl', 'Serbian': 'sr', 'Swedish': 'sv',
+    'Swahili': 'sw', 'Tamil': 'ta', 'Thai': 'th', 'Tagalog': 'tl',
+    'Turkish': 'tr', 'Ukrainian': 'uk', 'Urdu': 'ur', 'Vietnamese': 'vi',
+    'Chinese': 'zh'
+};
+
+const getLanguageCode = (lang: string) => {
+    if (lang.length === 2) return lang.toLowerCase();
+    
+    // Find key ignoring case
+    const key = Object.keys(LANGUAGE_CODE_MAP).find(k => k.toLowerCase() === lang.toLowerCase());
+    return key ? LANGUAGE_CODE_MAP[key] : 'en'; // default to english if not found
+};
+
 export const useRealtimeTranslation = (langA: string, langB: string) => {
     const [isConnected, setIsConnected] = useState(false);
     const [transcript, setTranscript] = useState('');
@@ -248,7 +274,7 @@ export const useRealtimeTranslation = (langA: string, langB: string) => {
                 session: {
                     audio: {
                         output: {
-                            language: langB,
+                            language: getLanguageCode(langB),
                         }
                     }
                 }
