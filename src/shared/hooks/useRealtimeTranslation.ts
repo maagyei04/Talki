@@ -52,6 +52,7 @@ export const useRealtimeTranslation = (langA: string, langB: string) => {
     const isAISpeaking = useRef(false);
     const audioDeltas = useRef<string[]>([]);
     const audioPlayer = useRef<AudioPlayer | null>(null);
+    const playbackDebounceTimer = useRef<NodeJS.Timeout | null>(null);
 
     // ID tracking
     const currentResponseId = useRef<string | null>(null);
@@ -289,11 +290,16 @@ export const useRealtimeTranslation = (langA: string, langB: string) => {
             switch (msg.type) {
                 // Input transcription (what the source speaker said)
                 case 'session.input_transcript.delta':
-                    if (msg.item_id !== currentItemId.current) {
-                        currentItemId.current = msg.item_id || null;
+                    if (msg.response_id && msg.response_id !== currentResponseId.current) {
+                        currentResponseId.current = msg.response_id;
                         setTranscript(msg.delta || '');
+                        pendingTranscript.current = msg.delta || '';
+                        setTranslation('');
+                        pendingTranslation.current = '';
+                        audioDeltas.current = [];
                     } else {
                         setTranscript(prev => prev + (msg.delta || ''));
+                        pendingTranscript.current += (msg.delta || '');
                     }
                     break;
 
@@ -301,17 +307,26 @@ export const useRealtimeTranslation = (langA: string, langB: string) => {
                     console.log('🎤 Source transcript done:', msg.transcript);
                     setTranscript(msg.transcript || '');
                     pendingTranscript.current = msg.transcript || '';
-                    tryPersistLiveTurn();
                     break;
 
                 // Output translation transcript (the translated text)
                 case 'session.output_transcript.delta':
-                    if (msg.response_id !== currentResponseId.current) {
-                        currentResponseId.current = msg.response_id || null;
+                    if (msg.response_id && msg.response_id !== currentResponseId.current) {
+                        currentResponseId.current = msg.response_id;
                         setTranslation(msg.delta || '');
+                        pendingTranslation.current = msg.delta || '';
+                        setTranscript('');
+                        pendingTranscript.current = '';
+                        audioDeltas.current = [];
                     } else {
                         setTranslation(prev => prev + (msg.delta || ''));
+                        pendingTranslation.current += (msg.delta || '');
                     }
+                    if (playbackDebounceTimer.current) clearTimeout(playbackDebounceTimer.current);
+                    playbackDebounceTimer.current = setTimeout(() => {
+                        playOpenAIAudio();
+                        tryPersistLiveTurn();
+                    }, 800) as unknown as NodeJS.Timeout;
                     break;
 
                 case 'session.output_transcript.done':
@@ -319,17 +334,17 @@ export const useRealtimeTranslation = (langA: string, langB: string) => {
                         console.log('🤖 Translation completed:', msg.transcript);
                         setTranslation(msg.transcript);
                         pendingTranslation.current = msg.transcript;
-                        tryPersistLiveTurn();
                     }
                     break;
 
                 // Translated audio output
                 case 'session.output_audio.delta':
                     if (msg.delta) audioDeltas.current.push(msg.delta);
-                    break;
-
-                case 'session.output_audio.done':
-                    playOpenAIAudio();
+                    if (playbackDebounceTimer.current) clearTimeout(playbackDebounceTimer.current);
+                    playbackDebounceTimer.current = setTimeout(() => {
+                        playOpenAIAudio();
+                        tryPersistLiveTurn();
+                    }, 800) as unknown as NodeJS.Timeout;
                     break;
 
                 // Speech detection events
@@ -446,6 +461,7 @@ export const useRealtimeTranslation = (langA: string, langB: string) => {
         sessionToken.current = null;
 
         if (heartbeatInterval.current) { clearInterval(heartbeatInterval.current); heartbeatInterval.current = null; }
+        if (playbackDebounceTimer.current) { clearTimeout(playbackDebounceTimer.current); playbackDebounceTimer.current = null; }
         if (reconnectTimer.current) { clearTimeout(reconnectTimer.current); reconnectTimer.current = null; }
 
         if (audioPlayer.current) {
