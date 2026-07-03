@@ -4,7 +4,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+};
 
 serve(async (req: Request) => {
     // 1. Handle CORS preflight
@@ -43,26 +43,29 @@ serve(async (req: Request) => {
             return new Response("Unauthorized", { status: 401, headers: corsHeaders });
         }
 
-        console.log(`User ${user.id} authenticated. Upgrading and connecting to OpenAI...`);
+        console.log(`User ${user.id} authenticated. Connecting to OpenAI Translation API...`);
 
         // Now upgrade to WebSocket for the client
         const { socket: clientSocket, response } = Deno.upgradeWebSocket(req);
 
-        // 4. Connect to OpenAI Realtime API
-        // For environments where you cannot set headers, OpenAI supports passing the key as a subprotocol
-        const url = `wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17`;
-        const openAiSocket = new WebSocket(url, [
-            'realtime',
-            'openai-insecure-api-key.' + openAiKey
-        ]);
+        // 4. Connect to OpenAI Realtime Translation API
+        // Using the dedicated /v1/realtime/translations endpoint with gpt-realtime-translate model
+        const url = `wss://api.openai.com/v1/realtime/translations?model=gpt-realtime-translate`;
+        const openAiSocket = new WebSocket(url, {
+            headers: {
+                Authorization: `Bearer ${openAiKey}`,
+                "OpenAI-Safety-Identifier": user.id,
+            },
+        } as ConstructorParameters<typeof WebSocket>[1]);
 
         const messageQueue: string[] = [];
         let openAiReady = false;
         let audioDeltaCount = 0;
 
         openAiSocket.onopen = () => {
-            console.log("Realtime connection established with OpenAI");
+            console.log(`Translation session established with OpenAI for user ${user.id}`);
             openAiReady = true;
+            // Drain any queued messages from before we connected
             while (messageQueue.length > 0) {
                 const msg = messageQueue.shift();
                 if (msg) openAiSocket.send(msg);
@@ -72,14 +75,17 @@ serve(async (req: Request) => {
         openAiSocket.onmessage = (event) => {
             const data = JSON.parse(event.data);
 
-            // diagnostic logging for audio flow
-            if (data.type === 'response.output_audio.delta') {
+            // Diagnostic logging for translation-specific events
+            if (data.type === 'session.output_audio.delta') {
                 audioDeltaCount++;
                 if (audioDeltaCount % 20 === 0) {
                     console.log(`Forwarded ${audioDeltaCount} audio deltas to user ${user.id}`);
                 }
-            } else if (data.type !== 'input_audio_buffer.append' && data.type !== 'input_audio_buffer.committed') {
-                console.log(`OpenAI -> Client: ${data.type}`);
+            } else if (
+                data.type !== 'session.input_audio_buffer.append' &&
+                data.type !== 'session.input_audio_buffer.committed'
+            ) {
+                console.log(`OpenAI -> Client [${user.id}]: ${data.type}`);
             }
 
             if (clientSocket.readyState === WebSocket.OPEN) {
@@ -88,7 +94,7 @@ serve(async (req: Request) => {
         };
 
         openAiSocket.onclose = (event) => {
-            console.error(`❌ OpenAI CLOSED for user ${user.id}!`);
+            console.error(`❌ OpenAI Translation session CLOSED for user ${user.id}!`);
             console.error(`   Code: ${event.code}`);
             console.error(`   Reason: "${event.reason}" (empty=${!event.reason})`);
             console.error(`   WasClean: ${event.wasClean}`);
@@ -96,9 +102,9 @@ serve(async (req: Request) => {
         };
 
         openAiSocket.onerror = (error) => {
-            console.error("❌ OpenAI WebSocket Error:", error);
+            console.error(`❌ OpenAI WebSocket Error for user ${user.id}:`, error);
             if (clientSocket.readyState === WebSocket.OPEN) {
-                clientSocket.send(JSON.stringify({ type: 'error', error: { message: 'OpenAI connection failed' } }));
+                clientSocket.send(JSON.stringify({ type: 'error', error: { message: 'OpenAI translation connection failed' } }));
             }
             if (clientSocket.readyState <= WebSocket.OPEN) clientSocket.close();
         };
@@ -109,15 +115,16 @@ serve(async (req: Request) => {
             try {
                 const data = JSON.parse(event.data);
 
-                // NEW: Handle heartbeats silently at the relay level
+                // Handle heartbeats silently at the relay level
                 if (data.type === 'client.heartbeat') {
                     return;
                 }
 
-                if (data.type !== 'input_audio_buffer.append') {
+                if (data.type !== 'session.input_audio_buffer.append') {
                     clientMessageCount++;
                     console.log(`Client ${user.id} -> OpenAI (#${clientMessageCount}): ${data.type}`);
                 }
+
                 if (openAiReady && openAiSocket.readyState === WebSocket.OPEN) {
                     openAiSocket.send(event.data);
                 } else {
@@ -129,8 +136,12 @@ serve(async (req: Request) => {
         };
 
         clientSocket.onclose = (event) => {
-            console.log(`Client ${user.id} disconnected. Code: ${event.code}, Reason: ${event.reason}`);
-            if (openAiSocket.readyState <= WebSocket.OPEN) openAiSocket.close(event.code, event.reason);
+            console.log(`Client ${user.id} disconnected. Code: ${event.code}`);
+            // Gracefully close the translation session before closing the socket
+            if (openAiSocket.readyState === WebSocket.OPEN) {
+                openAiSocket.send(JSON.stringify({ type: 'session.close' }));
+            }
+            if (openAiSocket.readyState <= WebSocket.OPEN) openAiSocket.close();
         };
 
         clientSocket.onerror = (error: Event) => {

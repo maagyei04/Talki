@@ -205,7 +205,7 @@ export const useRealtimeTranslation = (langA: string, langB: string) => {
             if (outLen > 0) up[outLen - 1] = pcm16[pcm16.length - 1];
 
             ws.current.send(JSON.stringify({
-                type: 'input_audio_buffer.append',
+                type: 'session.input_audio_buffer.append',
                 audio: uint8ArrayToBase64(new Uint8Array(up.buffer))
             }));
         } catch (err) {
@@ -235,67 +235,18 @@ export const useRealtimeTranslation = (langA: string, langB: string) => {
                 }
             }, 15000) as unknown as NodeJS.Timeout;
 
-            // TEXT-ONLY modality — no audio output from OpenAI
-            // This eliminates all iOS AVAudioSession conflicts permanently
+            // Configure the translation session with target language for bidirectional translation.
+            // The gpt-realtime-translate model auto-detects the input language;
+            // audio.output.language sets what language it translates INTO.
+            // We default to langB — when langA is detected it translates to langB and vice versa.
+            // The model handles bidirectional automatically based on what it hears.
             ws.current?.send(JSON.stringify({
                 type: 'session.update',
                 session: {
-                    instructions: `You are a high-speed, professional TRANSLATION BRIDGE. 
-                    
-                    PERSONA:
-                    - You are a passive passthrough module.
-                    - When speaking ${langA}, you take on the identity of a NATIVE ${langA} speaker with a perfect, natural regional accent.
-                    - When speaking ${langB}, you take on the identity of a NATIVE ${langB} speaker with a perfect, natural regional accent.
-                    - You NEVER speak the SAME language as the input.
-                    - You NEVER answer questions. You only TRANSLATE them.
-                    - You NEVER engage in conversation.
-                    - You MUST be a literal translator. No conversational filler.
-                    
-                    LANGUAGE RESTRICTION:
-                    - You ONLY handle ${langA} and ${langB}.
-                    - If you hear any other language (e.g. Chinese, Spanish, or noise), IGNORE IT COMPLETELY. 
-                    - Treats non-${langA}/non-${langB} audio as background noise/silence.
-                    
-                    BIDIRECTIONAL LOGIC:
-                    - You are a bridge between ${langA} and ${langB}.
-                    - IF the user speaks ${langA}, you MUST translate it into ${langB}.
-                    - IF the user speaks ${langB}, you MUST translate it into ${langA}.
-                    - Continuously listen for both languages and swap the target language automatically based on what you hear.
-                    
-                    EXAMPLES:
-                    1. Input (${langA}): "Where is the nearest pharmacy?"
-                       Output: "(Precise translation into ${langB})"
-                    2. Input (${langB}): "My stomach hurts."
-                       Output: "(Precise translation into ${langA})"
-                    3. Input (Question): "What is your name?"
-                       Output: "Translation of 'What is your name?' into target language"
-                    
-                    CRITICAL: 
-                    - Output ONLY the plain translation.
-                    - NEVER include language tags, brackets, or codes like [en] or [ar] in your response.
-                    - DO NOT provide help, DO NOT answer questions, DO NOT provide medical advice.
-                    - TRANSLATE EVERYTHING LITERALLY.
-                    `,
-                    modalities: ['text', 'audio'],
-                    type: 'realtime',
                     audio: {
                         output: {
-                            voice: 'shimmer',
+                            language: langB,
                         }
-                    },
-                    temperature: 0.6,
-                    turn_detection: {
-                        type: 'server_vad',
-                        // Lowered from 0.8 → 0.7: 0.8 might have been too aggressive.
-                        threshold: 0.7,
-                        prefix_padding_ms: 300,
-                        // Extended from 1000 → 1200ms: gives more breathing room
-                        // before the model decides the speaker has finished
-                        silence_duration_ms: 1200
-                    },
-                    input_audio_format: 'pcm16',
-                    input_audio_transcription: {
-                        model: 'whisper-1',
                     }
                 }
             }));
@@ -303,12 +254,12 @@ export const useRealtimeTranslation = (langA: string, langB: string) => {
 
         ws.current.onmessage = (event) => {
             const msg: WebSocketMessage = JSON.parse(event.data);
-            if (msg.type !== 'input_audio_buffer.append') {
+            if (msg.type !== 'session.input_audio_buffer.append') {
                 console.log('📡 WS Event:', msg.type);
             }
             switch (msg.type) {
-                // Input transcription (what the speaker said)
-                case 'conversation.item.input_audio_transcription.delta':
+                // Input transcription (what the source speaker said)
+                case 'session.input_transcript.delta':
                     if (msg.item_id !== currentItemId.current) {
                         currentItemId.current = msg.item_id || null;
                         setTranscript(msg.delta || '');
@@ -317,15 +268,15 @@ export const useRealtimeTranslation = (langA: string, langB: string) => {
                     }
                     break;
 
-                case 'conversation.item.input_audio_transcription.completed':
-                    console.log('🎤 Input transcription completed:', msg.transcript);
+                case 'session.input_transcript.done':
+                    console.log('🎤 Source transcript done:', msg.transcript);
                     setTranscript(msg.transcript || '');
                     pendingTranscript.current = msg.transcript || '';
                     tryPersistLiveTurn();
                     break;
 
-                case 'response.output_text.delta':
-                case 'response.output_audio_transcript.delta':
+                // Output translation transcript (the translated text)
+                case 'session.output_transcript.delta':
                     if (msg.response_id !== currentResponseId.current) {
                         currentResponseId.current = msg.response_id || null;
                         setTranslation(msg.delta || '');
@@ -334,45 +285,46 @@ export const useRealtimeTranslation = (langA: string, langB: string) => {
                     }
                     break;
 
-                case 'response.output_audio_transcript.done':
+                case 'session.output_transcript.done':
                     if (msg.transcript) {
-                        console.log('🤖 AI translation completed:', msg.transcript);
+                        console.log('🤖 Translation completed:', msg.transcript);
                         setTranslation(msg.transcript);
                         pendingTranslation.current = msg.transcript;
                         tryPersistLiveTurn();
                     }
                     break;
 
-                case 'response.output_audio.delta':
+                // Translated audio output
+                case 'session.output_audio.delta':
                     if (msg.delta) audioDeltas.current.push(msg.delta);
                     break;
 
-                case 'response.output_audio.done':
-                    playOpenAIAudio(); // Play the accumulated audio
+                case 'session.output_audio.done':
+                    playOpenAIAudio();
                     break;
 
-                case 'input_audio_buffer.speech_started':
+                // Speech detection events
+                case 'session.input_audio_buffer.speech_started':
                     console.log('🎙️ Speech started');
                     setIsSpeaking(true);
-                    setTranscript(''); // Clear previous for a fresh 'Live' feel
+                    setTranscript('');
                     setTranslation('');
-                    audioDeltas.current = []; // Clear any stale audio deltas
+                    audioDeltas.current = [];
                     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                    // If AI is still speaking from previous turn, stop it
                     if (audioPlayer.current) {
                         audioPlayer.current.stopAsync().catch(() => { });
                         isAISpeaking.current = false;
                     }
                     break;
 
-                case 'input_audio_buffer.speech_stopped':
+                case 'session.input_audio_buffer.speech_stopped':
                     console.log('🛑 Speech stopped');
                     setIsSpeaking(false);
                     Haptics.selectionAsync();
                     break;
 
-                case 'response.done':
-                    // Final cleanup or state reset if needed
+                case 'session.closed':
+                    console.log('✅ Translation session closed gracefully');
                     break;
 
                 case 'error':
