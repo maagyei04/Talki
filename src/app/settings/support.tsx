@@ -14,14 +14,14 @@ export default function SupportScreen() {
     };
 
     const sendEmail = async () => {
-        const url = 'mailto:support@talki.ai?subject=Support%20Request&body=Hi%20Talki%20Team%2C';
+        const url = 'mailto:talkiAI.app@gmail.com?subject=Support%20Request&body=Hi%20Talki%20Team%2C';
         const canOpen = await Linking.canOpenURL(url);
         if (canOpen) {
             await Linking.openURL(url);
         } else {
             Alert.alert(
                 'Contact Support',
-                'Reach us directly at:\nsupport@talki.ai',
+                'Reach us directly at:\ntalkiAI.app@gmail.com',
                 [{ text: 'OK' }]
             );
         }

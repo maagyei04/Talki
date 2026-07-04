@@ -17,7 +17,9 @@
         "NSCameraUsageDescription": "Talki needs access to your camera to take a profile picture",
         "NSPhotoLibraryUsageDescription": "Talki needs access to your photo library to upload a profile picture",
         "NSMicrophoneUsageDescription": "Talki needs access to your microphone to record audio",
-        "LSApplicationQueriesSchemes": ["mailto"]
+        "LSApplicationQueriesSchemes": [
+          "mailto"
+        ]
       }
     },
     "android": {
@@ -63,7 +65,8 @@
           "microphonePermission": "Talki needs access to your microphone to record audio"
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      "@config-plugins/react-native-webrtc"
     ],
     "experiments": {
       "typedRoutes": true,
