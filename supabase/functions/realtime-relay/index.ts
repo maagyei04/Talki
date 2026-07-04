@@ -49,8 +49,8 @@ serve(async (req: Request) => {
         const { socket: clientSocket, response } = Deno.upgradeWebSocket(req);
 
         // 4. Connect to OpenAI Realtime API (Voice Agent Architecture)
-        // Using the standard /v1/realtime endpoint with gpt-4o-realtime-preview to regain VAD and .done events
-        const url = `wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview`;
+        // Using the standard /v1/realtime endpoint with gpt-4o-realtime-preview-2024-12-17 to regain VAD and .done events
+        const url = `wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17`;
         const openAiSocket = new WebSocket(url, [
             'realtime',
             'openai-insecure-api-key.' + openAiKey
