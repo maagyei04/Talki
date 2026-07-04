@@ -155,7 +155,7 @@ export default function RegisterScreen() {
                     <View style={styles.legalContainer}>
                         <Text variant="caption" color="textSecondary" style={styles.legalText}>
                             By continuing, you agree to our{' '}
-                            <ExternalLink href={'https://maagyei04.github.io/Talki/terms/' as Href}>
+                            <ExternalLink href={'https://maagyei04.github.io/Talki/terms/' as any}>
                                 <Text
                                     variant="caption"
                                     color="primary"
@@ -165,7 +165,7 @@ export default function RegisterScreen() {
                                 </Text>
                             </ExternalLink>
                             {' '}and{' '}
-                            <ExternalLink href={'https://maagyei04.github.io/Talki/privacy/' as Href}>
+                            <ExternalLink href={'https://maagyei04.github.io/Talki/privacy/' as any}>
                                 <Text
                                     variant="caption"
                                     color="primary"
