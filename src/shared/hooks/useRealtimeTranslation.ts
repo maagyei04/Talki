@@ -1,6 +1,6 @@
 import { supabase } from '@/src/services/supabase';
 import { useAudioRecorder } from '@siteed/expo-audio-studio';
-import { createAudioPlayer, AudioPlayer } from 'expo-audio';
+import { createAudioPlayer, AudioPlayer, setAudioModeAsync } from 'expo-audio';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Haptics from 'expo-haptics';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -109,6 +109,7 @@ export const useRealtimeTranslation = (langA: string, langB: string) => {
 
     const playChime = async () => {
         try {
+            await setAudioModeAsync({ playsInSilentMode: true });
             const soundAsset = require('@assets/audio/blip.mp3');
             const sound = createAudioPlayer(soundAsset);
             sound.volume = 0.4;
@@ -179,7 +180,9 @@ export const useRealtimeTranslation = (langA: string, langB: string) => {
             const fileUri = `${cacheDir}speech_${Date.now()}.wav`;
             await FileSystem.writeAsStringAsync(fileUri, base64Wav, { encoding: FileSystem.EncodingType.Base64 });
 
-            const sound = createAudioPlayer(fileUri);
+            await setAudioModeAsync({ playsInSilentMode: true });
+            
+            const sound = createAudioPlayer({ uri: fileUri });
             sound.play();
             audioPlayer.current = sound;
 
@@ -273,6 +276,9 @@ export const useRealtimeTranslation = (langA: string, langB: string) => {
             ws.current?.send(JSON.stringify({
                 type: 'session.update',
                 session: {
+                    input_audio_transcription: {
+                        model: 'whisper-1'
+                    },
                     audio: {
                         output: {
                             language: getLanguageCode(langB),
