@@ -2,19 +2,20 @@ import { Box, Text } from '@/src/services/config';
 import { supabase } from '@/src/services/supabase';
 import { useTheme } from '@/src/shared/contexts/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { Href, useRouter } from 'expo-router';
 import React, { useState } from 'react';
+import { ExternalLink } from '@/src/shared/components/external-link';
 import {
     ActivityIndicator,
     Alert,
     KeyboardAvoidingView,
+    Linking,
     Platform,
     Pressable,
     ScrollView,
     StyleSheet,
     TextInput,
     View,
-    Linking,
 } from 'react-native';
 
 export default function RegisterScreen() {
@@ -154,23 +155,25 @@ export default function RegisterScreen() {
                     <View style={styles.legalContainer}>
                         <Text variant="caption" color="textSecondary" style={styles.legalText}>
                             By continuing, you agree to our{' '}
-                            <Text
-                                variant="caption"
-                                color="primary"
-                                style={styles.linkText}
-                                onPress={() => Linking.openURL('https://maagyei04.github.io/Talki/terms/')}
-                            >
-                                Terms of Use
-                            </Text>
+                            <ExternalLink href={'https://maagyei04.github.io/Talki/terms/' as Href}>
+                                <Text
+                                    variant="caption"
+                                    color="primary"
+                                    style={styles.linkText}
+                                >
+                                    Terms of Use
+                                </Text>
+                            </ExternalLink>
                             {' '}and{' '}
-                            <Text
-                                variant="caption"
-                                color="primary"
-                                style={styles.linkText}
-                                onPress={() => Linking.openURL('https://maagyei04.github.io/Talki/privacy/')}
-                            >
-                                Privacy Policy
-                            </Text>.
+                            <ExternalLink href={'https://maagyei04.github.io/Talki/privacy/' as Href}>
+                                <Text
+                                    variant="caption"
+                                    color="primary"
+                                    style={styles.linkText}
+                                >
+                                    Privacy Policy
+                                </Text>
+                            </ExternalLink>.
                         </Text>
                     </View>
                 </Box>
