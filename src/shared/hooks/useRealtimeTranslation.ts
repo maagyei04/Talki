@@ -67,8 +67,8 @@ export const useRealtimeTranslation = (langA: string, langB: string) => {
 
     // Helper to persist only when we have both sides of a turn
     const tryPersistLiveTurn = useCallback(() => {
-        if (!liveConversationId.current || !pendingTranscript.current || !pendingTranslation.current) {
-            console.log('⏳ Buffer incomplete, waiting for other side of turn...', {
+        if (!liveConversationId.current || !pendingTranslation.current) {
+            console.log('⏳ Buffer incomplete, waiting for translation...', {
                 hasTranscript: !!pendingTranscript.current,
                 hasTranslation: !!pendingTranslation.current
             });
@@ -132,7 +132,10 @@ export const useRealtimeTranslation = (langA: string, langB: string) => {
     };
 
     const playOpenAIAudio = async () => {
-        if (audioDeltas.current.length === 0) return;
+        if (audioDeltas.current.length === 0) {
+            console.log('⚠️ No audio deltas to play');
+            return;
+        }
         isAISpeaking.current = true;
 
         try {
@@ -191,6 +194,10 @@ export const useRealtimeTranslation = (langA: string, langB: string) => {
                     isAISpeaking.current = false;
                     sound.remove();
                     playChime(); // Play chime after audio finishes
+                } else if (!status.isLoaded && (status as any).error) {
+                    console.error('Audio playback error from expo-audio:', (status as any).error);
+                    isAISpeaking.current = false;
+                    sound.remove();
                 }
             });
         } catch (error) {
@@ -276,9 +283,6 @@ export const useRealtimeTranslation = (langA: string, langB: string) => {
             ws.current?.send(JSON.stringify({
                 type: 'session.update',
                 session: {
-                    input_audio_transcription: {
-                        model: 'whisper-1'
-                    },
                     audio: {
                         output: {
                             language: getLanguageCode(langB),
@@ -290,8 +294,8 @@ export const useRealtimeTranslation = (langA: string, langB: string) => {
 
         ws.current.onmessage = (event) => {
             const msg: WebSocketMessage = JSON.parse(event.data);
-            if (msg.type !== 'session.input_audio_buffer.append') {
-                console.log('📡 WS Event:', msg.type);
+            if (msg.type !== 'session.input_audio_buffer.append' && msg.type !== 'session.output_audio.delta') {
+                console.log('📡 WS Event:', msg.type, 'msg:', JSON.stringify(msg).substring(0, 100));
             }
             switch (msg.type) {
                 // Input transcription (what the source speaker said)
@@ -302,7 +306,7 @@ export const useRealtimeTranslation = (langA: string, langB: string) => {
                         pendingTranscript.current = msg.delta || '';
                         setTranslation('');
                         pendingTranslation.current = '';
-                        audioDeltas.current = [];
+                        // Do not clear audioDeltas here
                     } else {
                         setTranscript(prev => prev + (msg.delta || ''));
                         pendingTranscript.current += (msg.delta || '');
@@ -321,15 +325,14 @@ export const useRealtimeTranslation = (langA: string, langB: string) => {
                         currentResponseId.current = msg.response_id;
                         setTranslation(msg.delta || '');
                         pendingTranslation.current = msg.delta || '';
-                        setTranscript('');
-                        pendingTranscript.current = '';
-                        audioDeltas.current = [];
+                        // Do not clear audioDeltas here
                     } else {
                         setTranslation(prev => prev + (msg.delta || ''));
                         pendingTranslation.current += (msg.delta || '');
                     }
                     if (playbackDebounceTimer.current) clearTimeout(playbackDebounceTimer.current);
                     playbackDebounceTimer.current = setTimeout(() => {
+                        console.log('🤖 Translation stream ended (debounce)');
                         playOpenAIAudio();
                         tryPersistLiveTurn();
                     }, 800) as unknown as NodeJS.Timeout;
@@ -381,6 +384,12 @@ export const useRealtimeTranslation = (langA: string, langB: string) => {
                     if (msg.error?.message && !msg.error.message.includes('Cancellation failed')) {
                         console.error('❌ OpenAI Error:', msg.error.message);
                     }
+                    break;
+                case 'response.output_item.done':
+                case 'conversation.item.created':
+                case 'session.created':
+                case 'session.updated':
+                    // Just explicitly catch these so they don't look like unhandled types if we decide to log others
                     break;
             }
         };
