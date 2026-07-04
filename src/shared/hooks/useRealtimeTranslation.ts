@@ -335,7 +335,7 @@ export const useRealtimeTranslation = (langA: string, langB: string) => {
                         console.log('🤖 Translation stream ended (debounce)');
                         playOpenAIAudio();
                         tryPersistLiveTurn();
-                    }, 800) as unknown as NodeJS.Timeout;
+                    }, 300) as unknown as NodeJS.Timeout;
                     break;
 
                 case 'session.output_transcript.done':
@@ -353,7 +353,7 @@ export const useRealtimeTranslation = (langA: string, langB: string) => {
                     playbackDebounceTimer.current = setTimeout(() => {
                         playOpenAIAudio();
                         tryPersistLiveTurn();
-                    }, 800) as unknown as NodeJS.Timeout;
+                    }, 300) as unknown as NodeJS.Timeout;
                     break;
 
                 // Speech detection events
