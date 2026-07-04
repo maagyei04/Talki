@@ -48,10 +48,9 @@ serve(async (req: Request) => {
         // Now upgrade to WebSocket for the client
         const { socket: clientSocket, response } = Deno.upgradeWebSocket(req);
 
-        // 4. Connect to OpenAI Realtime Translation API
-        // Using the dedicated /v1/realtime/translations endpoint with gpt-realtime-translate model
-        // For environments where you cannot set headers (like standard Deno WebSocket), OpenAI supports passing the key as a subprotocol
-        const url = `wss://api.openai.com/v1/realtime/translations?model=gpt-realtime-translate`;
+        // 4. Connect to OpenAI Realtime API (Voice Agent Architecture)
+        // Using the standard /v1/realtime endpoint with gpt-4o-realtime-preview to regain VAD and .done events
+        const url = `wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview`;
         const openAiSocket = new WebSocket(url, [
             'realtime',
             'openai-insecure-api-key.' + openAiKey
@@ -136,9 +135,10 @@ serve(async (req: Request) => {
 
         clientSocket.onclose = (event) => {
             console.log(`Client ${user.id} disconnected. Code: ${event.code}`);
-            // Gracefully close the translation session before closing the socket
+            // Gracefully close the session before closing the socket if needed
+            // Standard realtime doesn't require session.close but it's safe to just close
             if (openAiSocket.readyState === WebSocket.OPEN) {
-                openAiSocket.send(JSON.stringify({ type: 'session.close' }));
+                // openAiSocket.send(JSON.stringify({ type: 'session.close' })); // Not supported in standard realtime
             }
             if (openAiSocket.readyState <= WebSocket.OPEN) openAiSocket.close();
         };

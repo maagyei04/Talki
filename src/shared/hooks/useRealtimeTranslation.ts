@@ -67,8 +67,8 @@ export const useRealtimeTranslation = (langA: string, langB: string) => {
 
     // Helper to persist only when we have both sides of a turn
     const tryPersistLiveTurn = useCallback(() => {
-        if (!liveConversationId.current || !pendingTranslation.current) {
-            console.log('⏳ Buffer incomplete, waiting for translation...', {
+        if (!liveConversationId.current || !pendingTranscript.current || !pendingTranslation.current) {
+            console.log('⏳ Buffer incomplete, waiting for other side of turn...', {
                 hasTranscript: !!pendingTranscript.current,
                 hasTranslation: !!pendingTranslation.current
             });
@@ -275,18 +275,20 @@ export const useRealtimeTranslation = (langA: string, langB: string) => {
                 }
             }, 15000) as unknown as NodeJS.Timeout;
 
-            // Configure the translation session with target language for bidirectional translation.
-            // The gpt-realtime-translate model auto-detects the input language;
-            // audio.output.language sets what language it translates INTO.
-            // We default to langB — when langA is detected it translates to langB and vice versa.
-            // The model handles bidirectional automatically based on what it hears.
+            // Configure the standard realtime session (Voice Agent Architecture) for instant VAD and turn detection
             ws.current?.send(JSON.stringify({
                 type: 'session.update',
                 session: {
-                    audio: {
-                        output: {
-                            language: getLanguageCode(langB),
-                        }
+                    instructions: `You are a real-time bidirectional translator. If the user speaks in ${langA}, translate immediately to ${langB}. If the user speaks in ${langB}, translate immediately to ${langA}. Only output the direct translation. Do not answer questions or add conversational filler.`,
+                    voice: 'alloy',
+                    turn_detection: {
+                        type: 'server_vad',
+                        threshold: 0.5,
+                        prefix_padding_ms: 300,
+                        silence_duration_ms: 500
+                    },
+                    input_audio_transcription: {
+                        model: 'whisper-1'
                     }
                 }
             }));
@@ -299,65 +301,49 @@ export const useRealtimeTranslation = (langA: string, langB: string) => {
             }
             switch (msg.type) {
                 // Input transcription (what the source speaker said)
-                case 'session.input_transcript.delta':
-                    if (msg.response_id && msg.response_id !== currentResponseId.current) {
-                        currentResponseId.current = msg.response_id;
-                        setTranscript(msg.delta || '');
-                        pendingTranscript.current = msg.delta || '';
-                        setTranslation('');
-                        pendingTranslation.current = '';
-                        // Do not clear audioDeltas here
-                    } else {
-                        setTranscript(prev => prev + (msg.delta || ''));
-                        pendingTranscript.current += (msg.delta || '');
+                case 'conversation.item.input_audio_transcription.completed':
+                    if (msg.transcript) {
+                        console.log('🎤 Source transcript completed:', msg.transcript);
+                        setTranscript(msg.transcript);
+                        pendingTranscript.current = msg.transcript;
+                        tryPersistLiveTurn();
                     }
                     break;
 
-                case 'session.input_transcript.done':
-                    console.log('🎤 Source transcript done:', msg.transcript);
-                    setTranscript(msg.transcript || '');
-                    pendingTranscript.current = msg.transcript || '';
-                    break;
-
                 // Output translation transcript (the translated text)
-                case 'session.output_transcript.delta':
+                case 'response.audio_transcript.delta':
                     if (msg.response_id && msg.response_id !== currentResponseId.current) {
                         currentResponseId.current = msg.response_id;
                         setTranslation(msg.delta || '');
                         pendingTranslation.current = msg.delta || '';
-                        // Do not clear audioDeltas here
+                        audioDeltas.current = []; // Safe to clear here since it's the start of a response
                     } else {
                         setTranslation(prev => prev + (msg.delta || ''));
                         pendingTranslation.current += (msg.delta || '');
                     }
-                    if (playbackDebounceTimer.current) clearTimeout(playbackDebounceTimer.current);
-                    playbackDebounceTimer.current = setTimeout(() => {
-                        console.log('🤖 Translation stream ended (debounce)');
-                        playOpenAIAudio();
-                        tryPersistLiveTurn();
-                    }, 300) as unknown as NodeJS.Timeout;
                     break;
 
-                case 'session.output_transcript.done':
+                case 'response.audio_transcript.done':
                     if (msg.transcript) {
                         console.log('🤖 Translation completed:', msg.transcript);
                         setTranslation(msg.transcript);
                         pendingTranslation.current = msg.transcript;
+                        tryPersistLiveTurn();
                     }
                     break;
 
                 // Translated audio output
-                case 'session.output_audio.delta':
+                case 'response.audio.delta':
                     if (msg.delta) audioDeltas.current.push(msg.delta);
-                    if (playbackDebounceTimer.current) clearTimeout(playbackDebounceTimer.current);
-                    playbackDebounceTimer.current = setTimeout(() => {
-                        playOpenAIAudio();
-                        tryPersistLiveTurn();
-                    }, 300) as unknown as NodeJS.Timeout;
+                    break;
+
+                case 'response.audio.done':
+                    console.log('🤖 Audio transmission completed instantly via .done event');
+                    playOpenAIAudio();
                     break;
 
                 // Speech detection events
-                case 'session.input_audio_buffer.speech_started':
+                case 'input_audio_buffer.speech_started':
                     console.log('🎙️ Speech started');
                     setIsSpeaking(true);
                     setTranscript('');
@@ -370,7 +356,7 @@ export const useRealtimeTranslation = (langA: string, langB: string) => {
                     }
                     break;
 
-                case 'session.input_audio_buffer.speech_stopped':
+                case 'input_audio_buffer.speech_stopped':
                     console.log('🛑 Speech stopped');
                     setIsSpeaking(false);
                     Haptics.selectionAsync();
