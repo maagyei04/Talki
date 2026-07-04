@@ -188,13 +188,7 @@ export const useRealtimeTranslation = (langA: string, langB: string) => {
                 console.error('Failed to create live conversation:', convError?.message);
             }
 
-            localStream.current = await mediaDevices.getUserMedia({ 
-                audio: {
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    autoGainControl: true
-                } 
-            }) as unknown as MediaStream;
+            localStream.current = await mediaDevices.getUserMedia({ audio: true }) as unknown as MediaStream;
             setIsRecording(true);
 
             // Use 'video' media type in InCallManager to activate iOS Voice Chat mode, which enables hardware AEC natively.
