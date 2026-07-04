@@ -124,29 +124,6 @@ export default function RegisterScreen() {
                             </View>
                         </View>
 
-                        <View style={styles.legalContainer}>
-                            <Text variant="caption" color="textSecondary" style={styles.legalText}>
-                                By continuing, you agree to our{' '}
-                                <Text
-                                    variant="caption"
-                                    color="primary"
-                                    style={styles.linkText}
-                                    onPress={() => Linking.openURL('https://maagyei04.github.io/Talki/terms/')}
-                                >
-                                    Terms of Use
-                                </Text>
-                                {' '}and{' '}
-                                <Text
-                                    variant="caption"
-                                    color="primary"
-                                    style={styles.linkText}
-                                    onPress={() => Linking.openURL('https://maagyei04.github.io/Talki/privacy/')}
-                                >
-                                    Privacy Policy
-                                </Text>.
-                            </Text>
-                        </View>
-
                         <Pressable
                             style={({ pressed }) => [
                                 styles.primaryButton,
@@ -167,12 +144,35 @@ export default function RegisterScreen() {
                         </Pressable>
                     </View>
 
-                    <Box flexDirection="row" justifyContent="center" marginTop="large" marginBottom="xxxl">
+                    <Box flexDirection="row" justifyContent="center" marginTop="large" marginBottom="large">
                         <Text variant="body" color="textSecondary">Already have an account? </Text>
                         <Pressable onPress={() => router.push('/auth/login')}>
                             <Text variant="body" color="info" fontWeight="bold">Login</Text>
                         </Pressable>
                     </Box>
+
+                    <View style={styles.legalContainer}>
+                        <Text variant="caption" color="textSecondary" style={styles.legalText}>
+                            By continuing, you agree to our{' '}
+                            <Text
+                                variant="caption"
+                                color="primary"
+                                style={styles.linkText}
+                                onPress={() => Linking.openURL('https://maagyei04.github.io/Talki/terms/')}
+                            >
+                                Terms of Use
+                            </Text>
+                            {' '}and{' '}
+                            <Text
+                                variant="caption"
+                                color="primary"
+                                style={styles.linkText}
+                                onPress={() => Linking.openURL('https://maagyei04.github.io/Talki/privacy/')}
+                            >
+                                Privacy Policy
+                            </Text>.
+                        </Text>
+                    </View>
                 </Box>
             </ScrollView>
         </KeyboardAvoidingView>
@@ -233,7 +233,8 @@ const styles = StyleSheet.create({
         marginTop: 8,
     },
     legalContainer: {
-        marginTop: -8,
+        marginTop: 24,
+        marginBottom: 40,
         paddingHorizontal: 4,
     },
     legalText: {
