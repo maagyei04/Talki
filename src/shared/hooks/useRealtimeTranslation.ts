@@ -1,85 +1,38 @@
 import { supabase } from '@/src/services/supabase';
-import { useAudioRecorder } from '@siteed/expo-audio-studio';
-import { createAudioPlayer, AudioPlayer, setAudioModeAsync } from 'expo-audio';
-import * as FileSystem from 'expo-file-system/legacy';
 import * as Haptics from 'expo-haptics';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import InCallManager from 'react-native-incall-manager';
+import { MediaStream, RTCPeerConnection, mediaDevices } from 'react-native-webrtc';
 
-interface WebSocketMessage {
-    type: string;
-    item_id?: string;
-    response_id?: string;
-    delta?: string;
-    [key: string]: any;
-}
-
-const LANGUAGE_CODE_MAP: Record<string, string> = {
-    'Afrikaans': 'af', 'Arabic': 'ar', 'Azerbaijani': 'az', 'Belarusian': 'be',
-    'Bulgarian': 'bg', 'Bosnian': 'bs', 'Catalan': 'ca', 'Czech': 'cs',
-    'Welsh': 'cy', 'Danish': 'da', 'German': 'de', 'Greek': 'el',
-    'English': 'en', 'Spanish': 'es', 'Estonian': 'et', 'Persian': 'fa',
-    'Finnish': 'fi', 'French': 'fr', 'Galician': 'gl', 'Hebrew': 'he',
-    'Hindi': 'hi', 'Croatian': 'hr', 'Hungarian': 'hu', 'Armenian': 'hy',
-    'Indonesian': 'id', 'Icelandic': 'is', 'Italian': 'it', 'Japanese': 'ja',
-    'Kazakh': 'kk', 'Kannada': 'kn', 'Korean': 'ko', 'Lithuanian': 'lt',
-    'Latvian': 'lv', 'Maori': 'mi', 'Macedonian': 'mk', 'Marathi': 'mr',
-    'Malay': 'ms', 'Nepali': 'ne', 'Dutch': 'nl', 'Norwegian': 'no',
-    'Polish': 'pl', 'Portuguese': 'pt', 'Romanian': 'ro', 'Russian': 'ru',
-    'Slovak': 'sk', 'Slovenian': 'sl', 'Serbian': 'sr', 'Swedish': 'sv',
-    'Swahili': 'sw', 'Tamil': 'ta', 'Thai': 'th', 'Tagalog': 'tl',
-    'Turkish': 'tr', 'Ukrainian': 'uk', 'Urdu': 'ur', 'Vietnamese': 'vi',
-    'Chinese': 'zh'
-};
-
-const getLanguageCode = (lang: string) => {
-    if (lang.length === 2) return lang.toLowerCase();
-    
-    // Find key ignoring case
-    const key = Object.keys(LANGUAGE_CODE_MAP).find(k => k.toLowerCase() === lang.toLowerCase());
-    return key ? LANGUAGE_CODE_MAP[key] : 'en'; // default to english if not found
-};
+const OPENAI_CALLS_URL = 'https://api.openai.com/v1/realtime/calls';
+// How long to keep the mic muted after the AI finishes speaking, so its own tail of audio
+// can't be picked back up by the mic and mistaken for new user speech.
+const DEFAULT_MIC_HANGOVER_MS = 1500;
 
 export const useRealtimeTranslation = (langA: string, langB: string) => {
     const [isConnected, setIsConnected] = useState(false);
+    const [isRecording, setIsRecording] = useState(false);
     const [transcript, setTranscript] = useState('');
     const [translation, setTranslation] = useState('');
     const [isSpeaking, setIsSpeaking] = useState(false);
 
-    const ws = useRef<WebSocket | null>(null);
-    const { startRecording, stopRecording, isRecording } = useAudioRecorder();
-
-    // Audio & State tracking
-    const isAISpeaking = useRef(false);
-    const audioDeltas = useRef<string[]>([]);
-    const audioPlayer = useRef<AudioPlayer | null>(null);
-    const playbackDebounceTimer = useRef<NodeJS.Timeout | null>(null);
-
-    // ID tracking
+    const localStream = useRef<MediaStream | null>(null);
+    const pc = useRef<RTCPeerConnection | null>(null);
+    const generation = useRef(0);
+    const micHangoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const currentResponseId = useRef<string | null>(null);
-    const currentItemId = useRef<string | null>(null);
-    const textBuffer = useRef('');
 
     // Live session persistence
     const liveConversationId = useRef<string | null>(null);
-    const pendingTranscript = useRef<string>('');    // buffered input (me)
-    const pendingTranslation = useRef<string>('');   // buffered output (AI)
-    const liveMessageCount = useRef<number>(0);      // tracks turns saved this session
+    const pendingTranscript = useRef('');
+    const pendingTranslation = useRef('');
+    const liveMessageCount = useRef(0);
 
-    // Helper to persist only when we have both sides of a turn
     const tryPersistLiveTurn = useCallback(() => {
-        if (!liveConversationId.current || !pendingTranscript.current || !pendingTranslation.current) {
-            console.log('⏳ Buffer incomplete, waiting for other side of turn...', {
-                hasTranscript: !!pendingTranscript.current,
-                hasTranslation: !!pendingTranslation.current
-            });
-            return;
-        }
+        if (!liveConversationId.current || !pendingTranscript.current || !pendingTranslation.current) return;
 
-        console.log('💾 Saving live turn to Supabase...');
         const original = pendingTranscript.current;
         const translated = pendingTranslation.current;
-
-        // Clear immediately to prevent double-save if another event fires
         pendingTranscript.current = '';
         pendingTranslation.current = '';
 
@@ -92,332 +45,138 @@ export const useRealtimeTranslation = (langA: string, langB: string) => {
         }).then(({ error }) => {
             if (error) {
                 console.error('❌ Live message save error:', error.message);
-                // Put them back if it failed due to some transient issue? 
-                // Actually RLS is the likely cause here, so we won't retry automatically.
             } else {
-                console.log('✅ Live message saved');
                 liveMessageCount.current += 1;
             }
         });
     }, []);
 
-    // Connection
-    const heartbeatInterval = useRef<NodeJS.Timeout | null>(null);
-    const shouldReconnect = useRef(false);
-    const reconnectTimer = useRef<NodeJS.Timeout | null>(null);
-    const sessionToken = useRef<string | null>(null);
-
-    const playChime = async () => {
-        try {
-            await setAudioModeAsync({ playsInSilentMode: true });
-            const soundAsset = require('@assets/audio/blip.mp3');
-            const sound = createAudioPlayer(soundAsset);
-            sound.volume = 0.4;
-            sound.play();
-            isAISpeaking.current = true; // Lock mic while chime is playing
-            sound.addListener('playbackStatusUpdate', (status) => {
-                if (status.isLoaded && status.didJustFinish) {
-                    sound.remove();
-                    // 500ms post-speech lockout — keeps the mic gated briefly after
-                    // the chime ends to prevent "ghost" triggers from the AI's own audio tail
-                    setTimeout(() => {
-                        isAISpeaking.current = false;
-                    }, 500);
-                }
-            });
-        } catch (err) {
-            console.error('Chime failed:', err);
-            isAISpeaking.current = false;
-        }
+    // Temporary diagnostic logging — every line is prefixed with ms since connect() so the
+    // event sequence can be reconstructed from Metro output while debugging.
+    const sessionStartTime = useRef(0);
+    const log = (...args: any[]) => {
+        const t = sessionStartTime.current ? Date.now() - sessionStartTime.current : 0;
+        console.log(`[RT +${t}ms]`, ...args);
     };
 
-    const playOpenAIAudio = async () => {
-        if (audioDeltas.current.length === 0) {
-            console.log('⚠️ No audio deltas to play');
-            return;
-        }
-        isAISpeaking.current = true;
-
-        try {
-            // Concatenate base64 deltas
-            const fullBase64 = audioDeltas.current.join('');
-            audioDeltas.current = []; // Clear for next run
-
-            // Create WAV header for PCM16 24kHz Mono
-            const writeWavHeader = (length: number) => {
-                const buffer = new ArrayBuffer(44);
-                const view = new DataView(buffer);
-                const writeString = (offset: number, string: string) => {
-                    for (let i = 0; i < string.length; i++) {
-                        view.setUint8(offset + i, string.charCodeAt(i));
-                    }
-                };
-                writeString(0, 'RIFF');
-                view.setUint32(4, 36 + length, true);
-                writeString(8, 'WAVE');
-                writeString(12, 'fmt ');
-                view.setUint32(16, 16, true);
-                view.setUint16(20, 1, true); // PCM
-                view.setUint16(22, 1, true); // Mono
-                view.setUint32(24, 24000, true); // Sample Rate (OpenAI default)
-                view.setUint32(28, 24000 * 2, true); // Byte Rate
-                view.setUint16(32, 2, true); // Block Align
-                view.setUint16(34, 16, true); // Bits per sample
-                writeString(36, 'data');
-                view.setUint32(40, length, true);
-                return buffer;
-            };
-
-            const binaryString = atob(fullBase64);
-            const pcmLength = binaryString.length;
-            const headerBuffer = writeWavHeader(pcmLength);
-
-            const fullBuffer = new Uint8Array(44 + pcmLength);
-            fullBuffer.set(new Uint8Array(headerBuffer), 0);
-            for (let i = 0; i < pcmLength; i++) {
-                fullBuffer[44 + i] = binaryString.charCodeAt(i);
-            }
-
-            const base64Wav = uint8ArrayToBase64(fullBuffer);
-            const cacheDir = FileSystem.cacheDirectory || FileSystem.documentDirectory;
-            const fileUri = `${cacheDir}speech_${Date.now()}.wav`;
-            await FileSystem.writeAsStringAsync(fileUri, base64Wav, { encoding: FileSystem.EncodingType.Base64 });
-
-            await setAudioModeAsync({ playsInSilentMode: true });
-            
-            const sound = createAudioPlayer({ uri: fileUri });
-            sound.play();
-            audioPlayer.current = sound;
-
-            sound.addListener('playbackStatusUpdate', (status) => {
-                if (status.isLoaded && status.didJustFinish) {
-                    isAISpeaking.current = false;
-                    sound.remove();
-                    playChime(); // Play chime after audio finishes
-                } else if (!status.isLoaded && (status as any).error) {
-                    console.error('Audio playback error from expo-audio:', (status as any).error);
-                    isAISpeaking.current = false;
-                    sound.remove();
-                }
-            });
-        } catch (error) {
-            console.error('Playback error:', error);
-            isAISpeaking.current = false;
-        }
+    const setLocalMicEnabled = (enabled: boolean) => {
+        const tracks = localStream.current?.getAudioTracks() ?? [];
+        log(`LOCAL MIC -> ${enabled ? 'ON' : 'OFF'} (tracks: ${tracks.length})`);
+        tracks.forEach(t => { t.enabled = enabled; });
     };
 
-    const uint8ArrayToBase64 = (uint8Array: Uint8Array): string => {
-        const CHUNK = 8192;
-        let binary = '';
-        for (let i = 0; i < uint8Array.length; i += CHUNK) {
-            const slice = uint8Array.subarray(i, i + CHUNK);
-            binary += String.fromCharCode.apply(null, slice as unknown as number[]);
-        }
-        return btoa(binary);
+    // NOTE: deliberately no audible chime here. The old expo-audio chime called
+    // setAudioModeAsync, which reconfigured the iOS AVAudioSession behind InCallManager's
+    // back and killed WebRTC's voice input unit — the mic went permanently silent after the
+    // first response. Haptics are safe; anything touching the audio session is not.
+    const signalYourTurn = () => {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
     };
 
-    // --- WebSocket ---
+    // Cut the local mic the instant the model starts speaking, so its own translated audio
+    // can never be picked back up by the mic and misread as new speech (the model runs
+    // server-side VAD with interrupt_response enabled, so leaked audio could otherwise cause
+    // it to interrupt itself). response.done is the authoritative "fully finished" signal —
+    // far more precise than guessing from a gap in transcript deltas.
+    const handleServerEvent = (raw: string) => {
+        let msg: any;
+        try { msg = JSON.parse(raw); } catch { return; }
 
-    // --- Mic → Server ---
+        switch (msg.type) {
+            case 'conversation.item.input_audio_transcription.delta':
+                log(`INPUT delta="${msg.delta}"`);
+                if (msg.delta) setTranscript(prev => prev + msg.delta);
+                break;
 
-    const handleAudioStream = async (event: any) => {
-        if (isAISpeaking.current || !ws.current || ws.current.readyState !== WebSocket.OPEN) {
-            if (isAISpeaking.current) {
-                // Mic Gating: Ignore input while AI is speaking
-            }
-            return;
-        }
-
-        try {
-            const binaryString = atob(event.data as string);
-            const bytes = new Uint8Array(binaryString.length);
-            for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
-            const pcm16 = new Int16Array(bytes.buffer);
-
-            // Upsample 16kHz → 24kHz
-            const outLen = Math.floor(pcm16.length * 1.5);
-            const up = new Int16Array(outLen);
-            for (let i = 0; i < pcm16.length - 1; i++) {
-                const o = Math.floor(i * 1.5);
-                up[o] = pcm16[i];
-                if (o + 1 < outLen) up[o + 1] = Math.round((pcm16[i] + pcm16[i + 1]) / 2);
-            }
-            if (outLen > 0) up[outLen - 1] = pcm16[pcm16.length - 1];
-
-            ws.current.send(JSON.stringify({
-                type: 'session.input_audio_buffer.append',
-                audio: uint8ArrayToBase64(new Uint8Array(up.buffer))
-            }));
-        } catch (err) {
-            console.error('Stream error:', err);
-        }
-    };
-
-    // --- WebSocket ---
-
-    const setupWebSocket = (token: string) => {
-        const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
-        const fnUrl = supabaseUrl.replace('https://', 'wss://') + '/functions/v1/realtime-relay';
-
-        // @ts-ignore
-        ws.current = new WebSocket(fnUrl, undefined, {
-            headers: { Authorization: `Bearer ${token}` }
-        });
-
-        ws.current.onopen = () => {
-            console.log('🟢 Connected');
-            setIsConnected(true);
-            // playChime(); // Optional: chime on start if desired
-
-            heartbeatInterval.current = setInterval(() => {
-                if (ws.current?.readyState === WebSocket.OPEN) {
-                    ws.current.send(JSON.stringify({ type: 'client.heartbeat' }));
+            case 'conversation.item.input_audio_transcription.completed':
+                log(`INPUT completed transcript="${msg.transcript}"`);
+                if (msg.transcript) {
+                    setTranscript(msg.transcript);
+                    pendingTranscript.current = msg.transcript;
+                    tryPersistLiveTurn();
                 }
-            }, 15000) as unknown as NodeJS.Timeout;
+                break;
 
-            // Configure the standard realtime session (Voice Agent Architecture) for instant VAD and turn detection
-            ws.current?.send(JSON.stringify({
-                type: 'session.update',
-                session: {
-                    instructions: `You are a real-time bidirectional translator. If the user speaks in ${langA}, translate immediately to ${langB}. If the user speaks in ${langB}, translate immediately to ${langA}. Only output the direct translation. Do not answer questions or add conversational filler.`,
-                    voice: 'alloy',
-                    turn_detection: {
-                        type: 'server_vad',
-                        threshold: 0.5,
-                        prefix_padding_ms: 300,
-                        silence_duration_ms: 500
-                    },
-                    input_audio_transcription: {
-                        model: 'whisper-1'
-                    }
+            case 'response.audio.delta':
+                // The instant audio starts coming in, cut the mic to prevent echoes
+                setLocalMicEnabled(false);
+                break;
+
+            case 'response.output_audio_transcript.delta':
+                log(`OUTPUT delta="${msg.delta}" response_id=${msg.response_id}`);
+                if (msg.response_id && msg.response_id !== currentResponseId.current) {
+                    currentResponseId.current = msg.response_id;
+                    setTranslation(msg.delta || '');
+                } else {
+                    setTranslation(prev => prev + (msg.delta || ''));
                 }
-            }));
-        };
+                pendingTranslation.current += msg.delta || '';
+                if (micHangoverTimer.current) { clearTimeout(micHangoverTimer.current); micHangoverTimer.current = null; }
+                setLocalMicEnabled(false);
+                break;
 
-        ws.current.onmessage = (event) => {
-            const msg: WebSocketMessage = JSON.parse(event.data);
-            if (msg.type !== 'session.input_audio_buffer.append' && msg.type !== 'session.output_audio.delta') {
-                console.log('📡 WS Event:', msg.type, 'msg:', JSON.stringify(msg).substring(0, 100));
-            }
-            switch (msg.type) {
-                // Input transcription (what the source speaker said)
-                case 'conversation.item.input_audio_transcription.completed':
-                    if (msg.transcript) {
-                        console.log('🎤 Source transcript completed:', msg.transcript);
-                        setTranscript(msg.transcript);
-                        pendingTranscript.current = msg.transcript;
-                        tryPersistLiveTurn();
-                    }
-                    break;
+            case 'response.output_audio_transcript.done':
+                log(`OUTPUT done transcript="${msg.transcript}"`);
+                if (msg.transcript) {
+                    setTranslation(msg.transcript);
+                    pendingTranslation.current = msg.transcript;
+                    tryPersistLiveTurn();
+                }
+                break;
 
-                // Output translation transcript (the translated text)
-                case 'response.audio_transcript.delta':
-                    if (msg.response_id && msg.response_id !== currentResponseId.current) {
-                        currentResponseId.current = msg.response_id;
-                        setTranslation(msg.delta || '');
-                        pendingTranslation.current = msg.delta || '';
-                        audioDeltas.current = []; // Safe to clear here since it's the start of a response
-                    } else {
-                        setTranslation(prev => prev + (msg.delta || ''));
-                        pendingTranslation.current += (msg.delta || '');
-                    }
-                    break;
+            case 'response.done':
+                // Calculate hangover based on translation length. Average speech is ~15 chars per second.
+                // We add 1.5 seconds base delay + length-based delay to ensure the WebRTC queue finishes playing.
+                const chars = pendingTranslation.current.length || 0;
+                const estimatedPlaybackMs = chars > 0 ? (chars * 60) + 1000 : DEFAULT_MIC_HANGOVER_MS;
+                
+                log(`RESPONSE DONE — mic re-enable in ${estimatedPlaybackMs}ms`);
+                if (micHangoverTimer.current) clearTimeout(micHangoverTimer.current);
+                micHangoverTimer.current = setTimeout(() => {
+                    setLocalMicEnabled(true);
+                    signalYourTurn();
+                }, estimatedPlaybackMs);
+                break;
 
-                case 'response.audio_transcript.done':
-                    if (msg.transcript) {
-                        console.log('🤖 Translation completed:', msg.transcript);
-                        setTranslation(msg.transcript);
-                        pendingTranslation.current = msg.transcript;
-                        tryPersistLiveTurn();
-                    }
-                    break;
+            case 'input_audio_buffer.speech_started':
+                log('SPEECH STARTED');
+                setIsSpeaking(true);
+                setTranscript('');
+                setTranslation('');
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                break;
 
-                // Translated audio output
-                case 'response.audio.delta':
-                    if (msg.delta) audioDeltas.current.push(msg.delta);
-                    break;
+            case 'input_audio_buffer.speech_stopped':
+                log('SPEECH STOPPED');
+                setIsSpeaking(false);
+                Haptics.selectionAsync();
+                break;
 
-                case 'response.audio.done':
-                    console.log('🤖 Audio transmission completed instantly via .done event');
-                    playOpenAIAudio();
-                    break;
+            case 'error':
+                console.error('❌ Realtime session error:', msg.error?.message || msg.error);
+                break;
 
-                // Speech detection events
-                case 'input_audio_buffer.speech_started':
-                    console.log('🎙️ Speech started');
-                    setIsSpeaking(true);
-                    setTranscript('');
-                    setTranslation('');
-                    audioDeltas.current = [];
-                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                    if (audioPlayer.current) {
-                        audioPlayer.current.pause();
-                        isAISpeaking.current = false;
-                    }
-                    break;
-
-                case 'input_audio_buffer.speech_stopped':
-                    console.log('🛑 Speech stopped');
-                    setIsSpeaking(false);
-                    Haptics.selectionAsync();
-                    break;
-
-                case 'session.closed':
-                    console.log('✅ Translation session closed gracefully');
-                    break;
-
-                case 'error':
-                    if (msg.error?.message && !msg.error.message.includes('Cancellation failed')) {
-                        console.error('❌ OpenAI Error:', msg.error.message);
-                    }
-                    break;
-                case 'response.output_item.done':
-                case 'conversation.item.created':
-                case 'session.created':
-                case 'session.updated':
-                    // Just explicitly catch these so they don't look like unhandled types if we decide to log others
-                    break;
-            }
-        };
-
-        ws.current.onerror = () => { };
-
-        ws.current.onclose = (event) => {
-            console.log('❌ WS closed — code:', event.code);
-            setIsConnected(false);
-
-            if (heartbeatInterval.current) {
-                clearInterval(heartbeatInterval.current);
-                heartbeatInterval.current = null;
-            }
-
-            if (shouldReconnect.current && sessionToken.current) {
-                console.log('🔄 Reconnecting in 1s...');
-                reconnectTimer.current = setTimeout(() => {
-                    if (shouldReconnect.current && sessionToken.current) {
-                        setupWebSocket(sessionToken.current);
-                    }
-                }, 1000) as unknown as NodeJS.Timeout;
-            } else {
-                stopRecording().catch(() => { });
-            }
-        };
+            default:
+                log(`UNHANDLED "${msg.type}":`, JSON.stringify(msg).slice(0, 200));
+                break;
+        }
     };
 
     // --- Public API ---
 
     const connect = async () => {
+        const myGeneration = ++generation.current;
+        sessionStartTime.current = Date.now();
+        log(`connect() called, langA=${langA} langB=${langB}`);
         try {
             const { data: { session } } = await supabase.auth.getSession();
             if (!session) throw new Error('Not authenticated');
 
-            sessionToken.current = session.access_token;
-            shouldReconnect.current = true;
-
-            // Create a new live conversation row for this session
             liveMessageCount.current = 0;
             pendingTranscript.current = '';
             pendingTranslation.current = '';
+            currentResponseId.current = null;
+
             const { data: conv, error: convError } = await supabase
                 .from('conversations')
                 .insert({ user_id: session.user.id, target_lang: langB, mode: 'live', lang_a: langA })
@@ -425,58 +184,92 @@ export const useRealtimeTranslation = (langA: string, langB: string) => {
                 .single();
             if (!convError && conv) {
                 liveConversationId.current = conv.id;
-                console.log('📝 Live conversation created:', conv.id);
             } else {
                 console.error('Failed to create live conversation:', convError?.message);
             }
 
-            setupWebSocket(session.access_token);
+            localStream.current = await mediaDevices.getUserMedia({ 
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true
+                } 
+            }) as unknown as MediaStream;
+            setIsRecording(true);
 
-            try {
-                await startRecording({
-                    sampleRate: 16000,
-                    channels: 1,
-                    encoding: 'pcm_16bit',
-                    interval: 100,
-                    ios: {
-                        audioSession: {
-                            category: 'PlayAndRecord',
-                            mode: 'VideoChat',
-                            categoryOptions: ['DefaultToSpeaker', 'AllowBluetooth', 'MixWithOthers']
-                        }
-                    },
-                    onAudioStream: handleAudioStream
-                });
-                console.log('🎙️ Recording started');
-            } catch (err) {
-                console.error('Mic error:', err);
+            // Use 'video' media type in InCallManager to activate iOS Voice Chat mode, which enables hardware AEC natively.
+            InCallManager.start({ media: 'video' });
+            InCallManager.setForceSpeakerphoneOn(true);
+
+            const { data, error } = await supabase.functions.invoke('realtime-session', {
+                body: { langA, langB },
+            });
+            if (error || !data?.value) {
+                throw new Error(`Failed to mint realtime token: ${error?.message || 'no client secret returned'}`);
             }
+            const clientSecret: string = data.value;
+
+            const connection = new RTCPeerConnection();
+            localStream.current.getAudioTracks().forEach(track => {
+                connection.addTrack(track, localStream.current!);
+            });
+
+            const dc = connection.createDataChannel('oai-events');
+            (dc as any).addEventListener('message', (event: any) => handleServerEvent(event.data));
+
+            (connection as any).addEventListener('connectionstatechange', () => {
+                if (connection.connectionState === 'failed' || connection.connectionState === 'closed') {
+                    console.error(`❌ Realtime connection ${connection.connectionState}`);
+                    disconnect();
+                }
+            });
+
+            const offer = await connection.createOffer();
+            await connection.setLocalDescription(offer);
+
+            const sdpResponse = await fetch(OPENAI_CALLS_URL, {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${clientSecret}`,
+                    'Content-Type': 'application/sdp',
+                },
+                body: offer.sdp,
+            });
+
+            if (!sdpResponse.ok) {
+                throw new Error(`OpenAI WebRTC handshake failed: ${await sdpResponse.text()}`);
+            }
+
+            const answerSdp = await sdpResponse.text();
+            await connection.setRemoteDescription({ type: 'answer', sdp: answerSdp });
+
+            if (myGeneration !== generation.current) {
+                // Session was torn down while the handshake was in flight.
+                try { dc.close(); } catch { }
+                try { connection.close(); } catch { }
+                return;
+            }
+
+            pc.current = connection;
+            setIsConnected(true);
         } catch (error: any) {
             console.error('Connect error:', error);
-            setIsConnected(false);
+            await disconnect();
         }
     };
 
     const disconnect = useCallback(async () => {
-        shouldReconnect.current = false;
-        sessionToken.current = null;
+        generation.current++;
+        if (micHangoverTimer.current) { clearTimeout(micHangoverTimer.current); micHangoverTimer.current = null; }
 
-        if (heartbeatInterval.current) { clearInterval(heartbeatInterval.current); heartbeatInterval.current = null; }
-        if (playbackDebounceTimer.current) { clearTimeout(playbackDebounceTimer.current); playbackDebounceTimer.current = null; }
-        if (reconnectTimer.current) { clearTimeout(reconnectTimer.current); reconnectTimer.current = null; }
+        try { pc.current?.close(); } catch { }
+        pc.current = null;
 
-        if (audioPlayer.current) {
-            try { audioPlayer.current.pause(); audioPlayer.current.remove(); } catch { }
-            audioPlayer.current = null;
-        }
+        localStream.current?.getTracks().forEach(t => t.stop());
+        localStream.current = null;
 
-        isAISpeaking.current = false;
-        audioDeltas.current = [];
+        try { InCallManager.stop(); } catch { }
 
-        if (ws.current) { ws.current.close(); ws.current = null; }
-        try { await stopRecording(); } catch { }
-
-        // Clean up empty live session (no turns were spoken)
         if (liveConversationId.current && liveMessageCount.current === 0) {
             supabase.from('conversations').delete()
                 .eq('id', liveConversationId.current)
@@ -488,10 +281,11 @@ export const useRealtimeTranslation = (langA: string, langB: string) => {
         pendingTranslation.current = '';
 
         setIsConnected(false);
+        setIsRecording(false);
         setTranscript('');
         setTranslation('');
         setIsSpeaking(false);
-    }, [stopRecording]);
+    }, []);
 
     useEffect(() => { return () => { disconnect(); }; }, [disconnect]);
 
