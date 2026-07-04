@@ -83,12 +83,12 @@ export default function SupportScreen() {
                         <SupportItem
                             icon="document-text-outline"
                             label="Terms of Service"
-                            onPress={() => openLink('https://talki.ai/terms')}
+                            onPress={() => openLink('https://maagyei04.github.io/Talki/terms/')}
                         />
                         <SupportItem
                             icon="shield-outline"
                             label="Privacy Policy"
-                            onPress={() => openLink('https://talki.ai/privacy')}
+                            onPress={() => openLink('https://maagyei04.github.io/Talki/privacy/')}
                             isLast
                         />
                     </Box>
