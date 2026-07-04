@@ -68,7 +68,14 @@ export default function RootLayout() {
       if (session?.user) {
         Purchases.logIn(session.user.id).catch(console.error);
       } else if (event === 'SIGNED_OUT') {
-        Purchases.logOut().catch(console.error);
+        Purchases.logOut().catch((err) => {
+          if (err && err.message && err.message.includes('anonymous')) {
+            // Safe to ignore, user is already logged out of RevenueCat
+            console.log('RevenueCat user is already anonymous, skipping logout.');
+          } else {
+            console.error('RevenueCat LogOut Error:', err);
+          }
+        });
       }
     });
 
