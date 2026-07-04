@@ -14,6 +14,7 @@ import {
     StyleSheet,
     TextInput,
     View,
+    Linking,
 } from 'react-native';
 
 export default function RegisterScreen() {
@@ -123,6 +124,29 @@ export default function RegisterScreen() {
                             </View>
                         </View>
 
+                        <View style={styles.legalContainer}>
+                            <Text variant="caption" color="textSecondary" style={styles.legalText}>
+                                By continuing, you agree to our{' '}
+                                <Text
+                                    variant="caption"
+                                    color="primary"
+                                    style={styles.linkText}
+                                    onPress={() => Linking.openURL('https://maagyei04.github.io/Talki/terms/')}
+                                >
+                                    Terms of Use
+                                </Text>
+                                {' '}and{' '}
+                                <Text
+                                    variant="caption"
+                                    color="primary"
+                                    style={styles.linkText}
+                                    onPress={() => Linking.openURL('https://maagyei04.github.io/Talki/privacy/')}
+                                >
+                                    Privacy Policy
+                                </Text>.
+                            </Text>
+                        </View>
+
                         <Pressable
                             style={({ pressed }) => [
                                 styles.primaryButton,
@@ -207,5 +231,16 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         marginTop: 8,
+    },
+    legalContainer: {
+        marginTop: -8,
+        paddingHorizontal: 4,
+    },
+    legalText: {
+        textAlign: 'center',
+        lineHeight: 20,
+    },
+    linkText: {
+        fontWeight: '600',
     },
 });
