@@ -1,8 +1,9 @@
 import { Box, Text } from '@/src/services/config';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React from 'react';
-import { I18nManager, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { I18nManager, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 
 const ACCENT = '#420080ff';
@@ -13,58 +14,70 @@ import { useTranslation } from 'react-i18next';
 export default function AssistantLandingScreen() {
   const router = useRouter();
   const { t } = useTranslation();
+  const tabBarHeight = useBottomTabBarHeight();
 
   const handleStart = () => {
     router.push('/assistant');
   };
 
   return (
-    <Box flex={1} backgroundColor="background" padding="medium" justifyContent="center">
-      <Animated.View entering={FadeIn.duration(600)} style={styles.content}>
-        <View style={styles.iconContainer}>
-          <MaterialCommunityIcons name="robot-outline" size={48} color={ACCENT} />
-        </View>
+    <Box flex={1} backgroundColor="background">
+      <ScrollView
+        contentContainerStyle={{
+          flexGrow: 1,
+          padding: 16,
+          justifyContent: 'center',
+          paddingBottom: tabBarHeight + 24,
+        }}
+        showsVerticalScrollIndicator={false}
+        bounces={false}
+      >
+        <Animated.View entering={FadeIn.duration(600)} style={styles.content}>
+          <View style={styles.iconContainer}>
+            <MaterialCommunityIcons name="robot-outline" size={48} color={ACCENT} />
+          </View>
 
-        <Text variant="heading2" textAlign="center" marginBottom="small" fontWeight="bold">
-          {t('assistant.title')}
-        </Text>
+          <Text variant="heading2" textAlign="center" marginBottom="small" fontWeight="bold">
+            {t('assistant.title')}
+          </Text>
 
-        <Text variant="body" textAlign="center" color="textSecondary" marginBottom="xl">
-          {t('assistant.landing.subtitle')}
-        </Text>
+          <Text variant="body" textAlign="center" color="textSecondary" marginBottom="xl">
+            {t('assistant.landing.subtitle')}
+          </Text>
 
-        <View style={styles.featuresContainer}>
-          <FeatureItem
-            icon="microphone"
-            title={t('assistant.landing.feature1.title')}
-            desc={t('assistant.landing.feature1.desc')}
-            delay={200}
-          />
-          <FeatureItem
-            icon="lightning-bolt"
-            title={t('assistant.landing.feature2.title')}
-            desc={t('assistant.landing.feature2.desc')}
-            delay={400}
-          />
-          <FeatureItem
-            icon="microphone-outline"
-            title={t('assistant.landing.feature3.title')}
-            desc={t('assistant.landing.feature3.desc')}
-            delay={600}
-          />
-        </View>
+          <View style={styles.featuresContainer}>
+            <FeatureItem
+              icon="microphone"
+              title={t('assistant.landing.feature1.title')}
+              desc={t('assistant.landing.feature1.desc')}
+              delay={200}
+            />
+            <FeatureItem
+              icon="lightning-bolt"
+              title={t('assistant.landing.feature2.title')}
+              desc={t('assistant.landing.feature2.desc')}
+              delay={400}
+            />
+            <FeatureItem
+              icon="microphone-outline"
+              title={t('assistant.landing.feature3.title')}
+              desc={t('assistant.landing.feature3.desc')}
+              delay={600}
+            />
+          </View>
 
-        <Animated.View entering={FadeInDown.delay(800).springify()}>
-          <TouchableOpacity
-            onPress={handleStart}
-            activeOpacity={0.8}
-            style={[styles.mainBtn, { flexDirection: I18nManager.isRTL ? 'row-reverse' : 'row' }]}
-          >
-            <Text style={styles.mainBtnText}>{t('assistant.landing.startChat')}</Text>
-            <Ionicons name={I18nManager.isRTL ? "arrow-back" : "arrow-forward"} size={20} color="#fff" />
-          </TouchableOpacity>
+          <Animated.View entering={FadeInDown.delay(800).springify()}>
+            <TouchableOpacity
+              onPress={handleStart}
+              activeOpacity={0.8}
+              style={[styles.mainBtn, { flexDirection: I18nManager.isRTL ? 'row-reverse' : 'row' }]}
+            >
+              <Text style={styles.mainBtnText}>{t('assistant.landing.startChat')}</Text>
+              <Ionicons name={I18nManager.isRTL ? "arrow-back" : "arrow-forward"} size={20} color="#fff" />
+            </TouchableOpacity>
+          </Animated.View>
         </Animated.View>
-      </Animated.View>
+      </ScrollView>
     </Box>
   );
 }

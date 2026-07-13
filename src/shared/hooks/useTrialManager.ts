@@ -2,10 +2,9 @@ import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/src/services/supabase';
 import { getPersistentDeviceId } from '../utils/deviceId';
 import Purchases, { CustomerInfo } from 'react-native-purchases';
-import { useRouter } from 'expo-router';
+import RevenueCatUI, { PAYWALL_RESULT } from "react-native-purchases-ui";
 
 export const useTrialManager = () => {
-  const router = useRouter();
   const [sessionsUsed, setSessionsUsed] = useState<number>(0);
   const [isPremium, setIsPremium] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -87,10 +86,16 @@ export const useTrialManager = () => {
 
   const presentPaywall = async () => {
     try {
-      router.push('/paywall');
-      return true;
+      const result: PAYWALL_RESULT = await RevenueCatUI.presentPaywall();
+      console.log('Paywall result:', result);
+      if (result === PAYWALL_RESULT.PURCHASED || result === PAYWALL_RESULT.RESTORED) {
+        const customerInfo = await Purchases.getCustomerInfo();
+        updatePremiumStatus(customerInfo);
+        return true;
+      }
+      return false;
     } catch (err) {
-      console.error('Error navigating to custom paywall:', err);
+      console.error('Error presenting paywall:', err);
       return false;
     }
   };

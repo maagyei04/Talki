@@ -1,5 +1,6 @@
 import { Box, Text } from '@/src/services/config';
 import { HistoryFilter, HistoryMessage, HistorySession, useHistory } from '@/src/shared/hooks/useHistory';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import React, { useCallback, useState } from 'react';
 import {
@@ -239,6 +240,7 @@ export default function HistoryScreen() {
     const { t } = useTranslation();
     const [filter, setFilter] = useState<HistoryFilter>('all');
     const { sessions, isLoading, refresh, fetchMessages, deleteSession, deleteMessage, clearAll } = useHistory(filter);
+    const tabBarHeight = useBottomTabBarHeight();
 
     const handleDelete = useCallback(async (id: string) => {
         await deleteSession(id);
@@ -305,7 +307,7 @@ export default function HistoryScreen() {
                             tintColor={ACCENT}
                         />
                     }
-                    ListFooterComponent={<View style={{ height: 120 }} />}
+                    ListFooterComponent={<View style={{ height: tabBarHeight + 40 }} />}
                 />
             )}
         </Box>

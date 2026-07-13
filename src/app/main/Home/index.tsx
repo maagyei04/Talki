@@ -2,6 +2,7 @@ import { Box, Text } from '@/src/services/config';
 import { supabase } from '@/src/services/supabase';
 import { useRealtimeTranslation } from '@/src/shared/hooks/useRealtimeTranslation';
 import { useVoiceRecorder } from '@/src/shared/hooks/useVoiceRecorder';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet } from 'react-native';
@@ -80,6 +81,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const { canStartSession, recordSession, presentPaywall, isPremium, sessionsUsed } = useTrialManager();
+  const tabBarHeight = useBottomTabBarHeight();
 
   // --- State & Hooks ---
   const [translationMode, setTranslationMode] = useState<'standard' | 'live'>('live');
@@ -562,7 +564,7 @@ export default function HomeScreen() {
       )}
 
       {/* Footer: Record Button */}
-      <Box alignItems="center" paddingBottom="xxl" paddingTop="small" style={{ paddingBottom: 110 }}>
+      <Box alignItems="center" paddingTop="small" style={{ paddingBottom: tabBarHeight + 20 }}>
         {/* Main Record/Stop Button */}
         <Pressable onPress={toggleRecording} disabled={isProcessing}>
           <Animated.View style={[

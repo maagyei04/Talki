@@ -2,6 +2,7 @@ import { Box, Text } from '@/src/services/config';
 import { supabase } from '@/src/services/supabase';
 import { useLanguage } from '@/src/shared/contexts/LanguageContext';
 import { useTrialManager } from '@/src/shared/hooks/useTrialManager';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -21,6 +22,7 @@ export default function ProfileScreen() {
   const { language: currentLanguage, isRTL } = useLanguage();
   const { t } = useTranslation();
   const { isPremium, sessionsUsed, presentPaywall } = useTrialManager();
+  const tabBarHeight = useBottomTabBarHeight();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [stats, setStats] = useState({ translations: 0, languages: 0, streak: 0 });
   const [loading, setLoading] = useState(true);
@@ -155,7 +157,11 @@ export default function ProfileScreen() {
 
   return (
     <Box flex={1} backgroundColor="background">
-      <ScrollView bounces={false} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        bounces={false}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: tabBarHeight + 24 }}
+      >
         {/* Header Section */}
         <Animated.View entering={FadeInDown.duration(600)} style={[styles.header, { backgroundColor: 'black' }]}>
           <Box paddingHorizontal="xl" paddingTop="xxxl" paddingBottom="xxl">
