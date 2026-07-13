@@ -10,6 +10,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 import { useTrialManager } from '@/src/shared/hooks/useTrialManager';
 import { Alert } from 'react-native';
+import { ExternalLink } from '@/src/shared/components/external-link';
+import Purchases, { Package } from 'react-native-purchases';
 
 const ACCENT = '#420080ff';
 
@@ -19,21 +21,40 @@ export default function PaywallScreen() {
   const { setIsPremium, restorePurchases } = useTrialManager();
   const [isRestoring, setIsRestoring] = React.useState(false);
 
-  const handleSubscribe = (plan: 'monthly' | 'yearly') => {
-    // Simulated Purchase Logic
-    Alert.alert(
-      t('common.success', 'Success!'),
-      `You are now a Talki Premium member (${plan} plan).`,
-      [
-        { 
-          text: 'OK', 
-          onPress: () => {
-            setIsPremium(true);
-            router.back();
-          } 
+  const [packages, setPackages] = React.useState<Package[]>([]);
+  const [isPurchasing, setIsPurchasing] = React.useState(false);
+
+  React.useEffect(() => {
+    const fetchOfferings = async () => {
+      try {
+        const offerings = await Purchases.getOfferings();
+        if (offerings.current !== null && offerings.current.availablePackages.length !== 0) {
+          setPackages(offerings.current.availablePackages);
         }
-      ]
-    );
+      } catch (e) {
+        console.error('Error fetching offerings', e);
+      }
+    };
+    fetchOfferings();
+  }, []);
+
+  const handleSubscribe = async (pkg: Package) => {
+    if (isPurchasing) return;
+    setIsPurchasing(true);
+    try {
+      const { customerInfo } = await Purchases.purchasePackage(pkg);
+      if (typeof customerInfo.entitlements.active['premium'] !== 'undefined') {
+        setIsPremium(true);
+        Alert.alert(t('common.success', 'Success!'), 'Welcome to Talki Premium!');
+        router.back();
+      }
+    } catch (e: any) {
+      if (!e.userCancelled) {
+        Alert.alert('Error', e.message);
+      }
+    } finally {
+      setIsPurchasing(false);
+    }
   };
 
   const handleRestore = async () => {
@@ -111,18 +132,19 @@ export default function PaywallScreen() {
           </Box>
 
           {/* Pricing Options */}
-          <PricingOption
-            title={t('paywall.plans.yearly')}
-            price={t('paywall.plans.yearlyPrice')}
-            savings={t('paywall.plans.yearlySavings')}
-            onPress={() => handleSubscribe('yearly')}
-            bestValue
-          />
-          <PricingOption
-            title={t('paywall.plans.monthly')}
-            price={t('paywall.plans.monthlyPrice')}
-            onPress={() => handleSubscribe('monthly')}
-          />
+          {packages.map((pkg) => {
+            const isYearly = pkg.packageType === 'ANNUAL';
+            return (
+              <PricingOption
+                key={pkg.identifier}
+                title={isYearly ? t('paywall.plans.yearly') : t('paywall.plans.monthly')}
+                price={pkg.product.priceString}
+                savings={isYearly ? t('paywall.plans.yearlySavings') : undefined}
+                onPress={() => handleSubscribe(pkg)}
+                bestValue={isYearly}
+              />
+            );
+          })}
 
           <Box marginTop="xl" alignItems="center">
             <TouchableOpacity onPress={handleRestore} disabled={isRestoring}>
@@ -131,13 +153,14 @@ export default function PaywallScreen() {
               </Text>
             </TouchableOpacity>
             
-            <Box flexDirection="row" marginTop="medium" gap="medium">
-              <TouchableOpacity>
+            <Box flexDirection="row" marginTop="medium" gap="medium" alignItems="center">
+              <ExternalLink href={'https://maagyei04.github.io/Talki/privacy/' as any}>
                 <Text variant="captionSmall" color="textSecondary">{t('paywall.privacy')}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity>
+              </ExternalLink>
+              <Text variant="captionSmall" color="borderLight">|</Text>
+              <ExternalLink href={'https://maagyei04.github.io/Talki/terms/' as any}>
                 <Text variant="captionSmall" color="textSecondary">{t('paywall.terms')}</Text>
-              </TouchableOpacity>
+              </ExternalLink>
             </Box>
           </Box>
         </Box>
